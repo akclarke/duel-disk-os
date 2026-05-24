@@ -1,0 +1,53 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* overflow: hidden; */
+  margin: 0px;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.hand-card-enter {
+    opacity: 0;
+    transform: translateY(20px);
+}
+.hand-card-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms ease, transform 300ms ease;
+}
+.hand-card-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+.hand-card-exit-active {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 300ms ease, transform 300ms ease;
+}
+ 
+.side-card-enter {
+    opacity: 0;
+    transform: scale(0.8);
+}
+.side-card-enter-active {
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 300ms ease, transform 300ms ease;
+}
+.side-card-exit {
+    opacity: 1;
+    transform: scale(1);
+}
+.side-card-exit-active {
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 300ms ease, transform 300ms ease;
+}

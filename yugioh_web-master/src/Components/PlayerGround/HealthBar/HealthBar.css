@@ -1,0 +1,125 @@
+.health_bar {
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+    position: absolute;
+    top: 10px;
+    width: 18%;
+    z-index: 5;
+    user-select: none;
+}
+
+.health_bar_MINE {
+    left: 10px;
+}
+
+.health_bar_OPPONENT {
+    right: 10px;
+}
+
+.health_bar_avatar_username_container {
+    display: flex;
+    justify-content: space-between;
+}
+
+.health_bar_avatar {
+    width: 25%;
+}
+
+.health_bar_username_container {
+    vertical-align: middle;
+}
+
+.health_bar_username {
+    font-weight: 700;
+    display: inline;
+    font-size: 20px;
+    font-family: Lato,sans-serif;
+}
+.health_bar {
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+    position: absolute;
+    top: 10px;
+    width: 18%;
+    z-index: 5;
+    user-select: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Glowing border when it's this player's turn */
+.health_bar_active {
+    border-color: #f0c040;
+    box-shadow: 0 0 12px rgba(240, 192, 64, 0.8);
+}
+
+.health_bar_MINE {
+    left: 10px;
+}
+
+.health_bar_OPPONENT {
+    right: 10px;
+}
+
+.health_bar_avatar_username_container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.health_bar_avatar {
+    width: 25%;
+}
+
+.health_bar_username_container {
+    flex: 1;
+}
+
+/* Row containing name + turn badge side by side */
+.health_bar_name_row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.health_bar_username {
+    font-weight: 700;
+    font-size: 18px;
+    font-family: Lato, sans-serif;
+    margin: 0;
+}
+
+.health_bar_hp {
+    font-size: 14px;
+    font-family: Lato, sans-serif;
+    color: #333;
+    margin: 2px 0 4px 0;
+}
+
+/* "YOUR TURN" badge shown on the active player's health bar */
+.health_bar_turn_badge {
+    background-color: #f0c040;
+    color: #1a1a1a;
+    font-size: 10px;
+    font-weight: 800;
+    font-family: Lato, sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    animation: pulse_badge 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse_badge {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.5; }
+    100% { opacity: 1; }
+}

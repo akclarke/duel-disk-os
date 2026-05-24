@@ -1,0 +1,88 @@
+.hand_card {
+    width: 8%;
+    margin-right: 10px;
+    overflow: hidden;
+    transition: transform 0.5s;
+    position: relative;
+}
+
+.hand_card:hover {
+    cursor: pointer;
+    transform: translate(0, -20px);
+}
+
+.hand_container_mine {
+    position: absolute;
+    display: flex;
+    width: 100%;
+    z-index: 3;
+    bottom: 5%;
+    justify-content: center;
+    user-select: none;
+
+}
+
+.hand_container_opponent {
+    position: absolute;
+    display: flex;
+    width: 100%;
+    z-index: 3;
+    top: 5%;
+    justify-content: center;
+    user-select: none;
+
+}
+
+/* .hand_container_mine > img {
+    transition: transform 0.5s;
+}
+
+.hand_container_mine > img:hover {
+    cursor: pointer;
+    transform: translate(0, -20px);
+} */
+
+.show_hand_option {
+    display: flex;
+    flex-direction: column;
+    border-width: 1.2rem;
+    border-color: black;
+    background-color: rgba(255, 255, 255, 0.5);
+    position: absolute;
+    width: 100%;
+    border-top: 2px solid black;
+}
+
+.no_hand_option {
+    display: none;
+}
+
+.show_summon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 2px solid black;
+
+}
+
+.show_summon:hover {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.example-enter {
+    transform: translateX(1000px);
+}
+  
+.example-enter.example-enter-active {
+    transform: translateX(0);
+    transition: transform 500ms ease-in;
+}
+
+.example-leave {
+    opacity: 1;
+}
+
+.example-leave.example-leave-active {
+    opacity: 0.01;
+    transition: opacity 300ms ease-in;
+}

@@ -1,0 +1,101 @@
+.turn_selector_container {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    top: 50%;
+    transform: translateY(-50%);
+    max-height: 95vh;
+    overflow-y: auto;
+}
+
+.phase_button {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 80px;
+    height: 30px;
+    margin: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    font-size: 11px;
+}
+
+.phase_button_current {
+    background-color: #a7fabe;
+}
+
+.phase_button_enabled:hover {
+    cursor: pointer;
+    background-size: cover;
+    color: white;
+
+}
+
+.phase_button_enabled_MP1:hover {
+    background-image: url("assets/black_magician_girl.jpg");
+    background-position: center;
+}
+
+.phase_button_enabled_Battle:hover {
+    background-image: url("assets/neos.jpg");
+}
+
+.phase_button_enabled_MP2:hover {
+    background-image: url("assets/star_dust_dragon.jpg");
+}
+
+.phase_button_enabled_End:hover {
+    background-image: url("assets/utopia.png");
+}
+
+
+.phase_button_disabled {
+    background-color: #ccc;
+}
+
+
+/* Phase animator css */
+.phase_block {
+    position: absolute;
+    transition: transform 0.5s;
+    transform: translate(-50%, -40%);    
+    top: 40%;
+    left: 50%;
+    z-index: 10;
+}
+
+.phase_block > h1 {
+    color: white;
+    font-size: 5em;
+}
+
+.phase_before {
+    transform: translate(calc(-150vh), -40%);
+}
+
+.phase_after {
+    transform: translate(calc(100vh), -40%);
+}
+
+.phase_invisible {
+    visibility: hidden;
+    opacity: 0;
+}
+
+.phase_black_bar {
+    width: 100%;
+    height: 20%;
+    position: absolute;
+    transform: translate(-50%, -40%);    
+    top: 40%;
+    left: 50%;
+    background-color: rgba(0,0,0,0.4);
+    z-index: 9;
+    transition: visibility 0.5s, opacity 0.5s
+}
