@@ -409,6 +409,74 @@ export const EFFECTS_REGISTRY = {
     // ── PENDULUM MONSTERS ────────────────────────────────────────────────
     // ════════════════════════════════════════════════════════════════════════
 
+    // Performapal Skullcrobat Joker (40318957)
+    // Monster Effect: "When this card is Normal or Special Summoned: You can add 1
+    // 'Performapal', 'Odd-Eyes', or 'Magician' card from your Deck to your hand,
+    // except 'Performapal Skullcrobat Joker'."
+    40318957: [{
+        on_summon: async (env) => {
+            const deck = env[SIDE.MINE][ENVIRONMENT.DECK];
+            const valid = deck.filter(c => {
+                const name = c?.card?.name || '';
+                return name.includes('Performapal') || name.includes('Odd-Eyes') || name.includes('Magician');
+            }).filter(c => c?.card?.key !== 40318957);
+            if (!valid.length) return;
+            logEvent(LOG_TYPE.EFFECT, 'Skullcrobat Joker: searching for Performapal/Odd-Eyes/Magician');
+            try {
+                const result = await openSelector({
+                    type: CARD_SELECT_TYPE.CARD_SELECT_FROM_DECK,
+                    label: 'Skullcrobat Joker — add 1 Performapal/Odd-Eyes/Magician from Deck to Hand',
+                    numToSelect: 1,
+                    sourceList: valid,
+                });
+                if (!result?.cardEnvs?.length) return;
+                const freshEnv = store.getState().environmentReducer.environment;
+                const freshDeck = freshEnv[SIDE.MINE][ENVIRONMENT.DECK];
+                for (const uid of result.cardEnvs) {
+                    const idx = freshDeck.findIndex(c => get_unique_id_from_ennvironment(c) === uid);
+                    if (idx !== -1) {
+                        const [found] = freshDeck.splice(idx, 1);
+                        freshEnv[SIDE.MINE][ENVIRONMENT.HAND].push(found);
+                        logEvent(LOG_TYPE.EFFECT, `Skullcrobat Joker: added ${found.card?.name} to hand`);
+                    }
+                }
+                dispatchEnv(freshEnv);
+            } catch { /* cancelled */ }
+        }
+    }],
+
+    // Performapal Pendulum Sorcerer (47075569)
+    // Monster Effect: "When this card is Special Summoned: You can target up to 2
+    // 'Performapal' cards in your Graveyard; add them to your hand."
+    47075569: [{
+        on_summon: async (env) => {
+            const gy = env[SIDE.MINE][ENVIRONMENT.GRAVEYARD];
+            const valid = gy.filter(c => c?.card?.name?.includes('Performapal'));
+            if (!valid.length) return;
+            logEvent(LOG_TYPE.EFFECT, 'Pendulum Sorcerer: targeting Performapals in GY');
+            try {
+                const result = await openSelector({
+                    type: CARD_SELECT_TYPE.CARD_SELECT_FROM_GY,
+                    label: 'Pendulum Sorcerer — add up to 2 Performapals from GY to Hand',
+                    numToSelect: Math.min(2, valid.length),
+                    sourceList: valid,
+                });
+                if (!result?.cardEnvs?.length) return;
+                const freshEnv = store.getState().environmentReducer.environment;
+                const freshGY = freshEnv[SIDE.MINE][ENVIRONMENT.GRAVEYARD];
+                for (const uid of result.cardEnvs) {
+                    const idx = freshGY.findIndex(c => get_unique_id_from_ennvironment(c) === uid);
+                    if (idx !== -1) {
+                        const [found] = freshGY.splice(idx, 1);
+                        freshEnv[SIDE.MINE][ENVIRONMENT.HAND].push(found);
+                        logEvent(LOG_TYPE.EFFECT, `Pendulum Sorcerer: returned ${found.card?.name} to hand`);
+                    }
+                }
+                dispatchEnv(freshEnv);
+            } catch { /* cancelled */ }
+        }
+    }],
+
     // Odd-Eyes Pendulum Dragon (16178681)
     // Pendulum Effect: "Once per turn, during your End Phase: You can destroy this card,
     // and if you do, add 1 Pendulum Monster with 1500 or less ATK from your Deck to your hand."

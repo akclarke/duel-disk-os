@@ -1,6 +1,6 @@
 import React from 'react';
 import { connect } from 'react-redux';
-import { ENVIRONMENT, CARD_TYPE, CARD_POS, SIDE} from '../../Card/utils/constant';
+import { ENVIRONMENT, CARD_TYPE, CARD_POS, SIDE } from '../../Card/utils/constant';
 import { CARD_SELECT_TYPE, PHASE } from '../utils/constant'
 import { is_monster, is_spell, is_trap } from '../../Card/utils/utils'
 import CardView from '../../Card/CardView';
@@ -191,9 +191,13 @@ class Hand extends React.Component {
             const levelSum = materials.reduce((s, c) => s + (c.card.level || 0), 0);
             if (!hasTuner || levelSum !== (target.card.level || 0)) return;
 
-            // Send materials to GY, summon Synchro
+            // Send materials to GY (pendulums auto-redirect to extra deck in move_cards_to_graveyard)
             Core.Summon.tribute(materialIds, SIDE.MINE, ENVIRONMENT.MONSTER_FIELD, environment);
-            const info = { side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK };
+            const defPos = window.confirm('Summon in Defense position? (Cancel = Attack position)');
+            const info = {
+                side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK,
+                position: defPos ? 'DEFENSE' : 'FACE',
+            };
             Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
         } catch (e) { /* cancelled */ }
     }
@@ -225,9 +229,24 @@ class Hand extends React.Component {
 
             if (materialIds.length !== numMaterials) return;
 
-            // Attach as overlay units (simplified: send to GY)
-            Core.Summon.tribute(materialIds, SIDE.MINE, ENVIRONMENT.MONSTER_FIELD, environment);
-            const info = { side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK };
+            // Remove materials from field and attach to XYZ monster as overlay units.
+            // They are NOT sent to the GY — they stay on target.xyz_materials.
+            const field = environment[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
+            const attachedMaterials = [];
+            for (const uid of materialIds) {
+                const idx = field.findIndex(c => c?.card && get_unique_id_from_ennvironment(c) === uid);
+                if (idx !== -1) {
+                    attachedMaterials.push(field[idx]);
+                    field[idx] = CARD_TYPE.PLACEHOLDER;
+                }
+            }
+            target.xyz_materials = attachedMaterials;
+
+            const defPos = window.confirm('Summon in Defense position? (Cancel = Attack position)');
+            const info = {
+                side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK,
+                position: defPos ? 'DEFENSE' : 'FACE',
+            };
             Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
         } catch (e) { /* cancelled */ }
     }
@@ -259,7 +278,8 @@ class Hand extends React.Component {
                             const can_summon = is_my_turn && is_main_phase && 
                                 cardEnv.card.can_normal_summon(cardEnv.card, environment)
                             const can_normal_summon = can_summon ? "show_summon" : "no_hand_option"
-                            const can_set = can_summon ? "show_summon" : "no_hand_option"
+                            // Pendulums can't be normal set face-down
+                            const can_set = can_summon && !isPendulum ? "show_summon" : "no_hand_option"
                             const isRitual = cardEnv.card.card_type === CARD_TYPE.MONSTER.RITUAL;
                             const can_special_summon = is_my_turn && is_main_phase && 
                                 cardEnv.card.can_special_summon(cardEnv.card, environment) 

@@ -67,8 +67,9 @@ const buildMonsterCard = (id, apiCard, cardType) => {
         card.scale = apiCard.scale ?? 0;
         card.pendDesc = apiCard.pend_desc || '';
         card.pendulumEffect = effects[0]?.pendulumEffect ?? null;
-        // Pendulum monsters cannot be normal summoned (they are placed to the pendulum zone)
-        card.can_normal_summon = () => false;
+        // Pendulums CAN be normal summoned face-up (tribute rules apply by level).
+        // They cannot be normal SET face-down — Hand.jsx hides the Set button.
+        // (can_normal_summon already set above via buildCanNormalSummon — no override needed)
     }
     if (cardType === CARD_TYPE.MONSTER.LINK) {
         card.linkRating = apiCard.linkval ?? 0;

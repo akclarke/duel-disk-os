@@ -15,7 +15,8 @@ const summon = (info, type, environment) => {
     if (type === SET_SUMMON || isSpellOrTrap) {
         info.card.current_pos = CARD_POS.SET;
     } else {
-        info.card.current_pos = CARD_POS.FACE;
+        // Caller may pass info.position to override (e.g. DEF for extra-deck summons)
+        info.card.current_pos = info.position || CARD_POS.FACE;
     }
     if (!isSpellOrTrap) {
         info.card.summoned_this_turn = true;
@@ -140,4 +141,53 @@ const changePosition = (cardEnv, newPos, environment) => {
     store.dispatch(update_environment({ ...environment }));
 };
 
-export default { summon, tribute, sendToGY, changePosition };
+/**
+ * Detach one XYZ material from an XYZ monster and send it to the GY.
+ * If the monster has more than one material, opens a card selector so the
+ * player can choose which one to detach.
+ * Returns the detached cardEnv (or null if cancelled / no materials).
+ */
+const detachXyzMaterial = async (xyzCardEnv, side, environment) => {
+    const materials = xyzCardEnv.xyz_materials;
+    if (!materials || materials.length === 0) return null;
+
+    let detachUid;
+    if (materials.length === 1) {
+        detachUid = get_unique_id_from_ennvironment(materials[0]);
+    } else {
+        // Ask player which material to detach
+        const { show_tool } = await import('../../Store/actions/toolActions');
+        const { TOOL_TYPE } = await import('../../Store/actions/actionTypes');
+        const { CARD_SELECT_TYPE } = await import('../../Components/PlayerGround/utils/constant');
+        try {
+            const result = await new Promise((resolve, reject) =>
+                store.dispatch(show_tool({
+                    tool_type: TOOL_TYPE.CARD_SELECTOR,
+                    info: {
+                        type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
+                        label: 'Select 1 XYZ Material to detach',
+                        sourceList: materials,
+                        numToSelect: 1,
+                        resolve, reject,
+                    },
+                }))
+            );
+            detachUid = result.cardEnvs?.[0];
+        } catch {
+            return null; // cancelled
+        }
+    }
+
+    const idx = materials.findIndex(c => get_unique_id_from_ennvironment(c) === detachUid);
+    if (idx === -1) return null;
+    const [detached] = materials.splice(idx, 1);
+
+    // Detached XYZ material always goes to GY (even if it's a pendulum)
+    const freshEnv = store.getState().environmentReducer.environment;
+    freshEnv[side][ENVIRONMENT.GRAVEYARD].push(detached);
+    logEvent(LOG_TYPE.EFFECT, `XYZ detach: ${detached.card?.name} → GY`, { cardName: detached.card?.name });
+    store.dispatch(update_environment(freshEnv));
+    return detached;
+};
+
+export default { summon, tribute, sendToGY, changePosition, detachXyzMaterial };
