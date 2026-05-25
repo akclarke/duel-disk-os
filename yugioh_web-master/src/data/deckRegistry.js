@@ -238,7 +238,7 @@ export const DECK_REGISTRY = {
         id: 'NUMBER_XYZ',
         name: 'Number XYZ',
         icon: '🔢',
-        description: "Yuma's deck. Goblindbergh + Kagetokage instantly give 2 Level-4s → XYZ Summon Number 39: Utopia.",
+        description: "Yuma's deck. Goblindbergh + Kagetokage instantly give 2 Level-4s → XYZ Summon Number 39: Utopia. Gagaga Girl x2 enable Rank 3 XYZ (Leviathan Dragon, Zenmaines).",
         available: true,
         era: 'ZEXAL',
         deck: [
@@ -266,9 +266,12 @@ export const DECK_REGISTRY = {
             97077563, 97077563,           // Call of the Haunted x2
         ],
         extra_deck: [
-            84013237, 84013237, 84013237, // Number 39: Utopia x3      (Rank 4)
-            56840427, 56840427,           // Number C39: Utopia Ray x2 (Rank 4)
-            12014404, 12014404,           // Gagaga Cowboy x2          (Rank 4, burn)
+            84013237, 84013237, 84013237, // Number 39: Utopia x3               (Rank 4)
+            56840427, 56840427,           // Number C39: Utopia Ray x2          (Rank 4)
+            12014404, 12014404,           // Gagaga Cowboy x2                   (Rank 4, burn)
+            69610924, 69610924,           // Number 17: Leviathan Dragon x2     (Rank 3, 2000 ATK)
+            78156759,                     // Wind-Up Zenmaines                  (Rank 3, indestructible)
+            95992081,                     // Leviair the Sea Dragon             (Rank 3, banish retrieval)
         ]
     },
 

@@ -8,8 +8,10 @@ import { create_card_from_api } from '../../data/cardLoader'
 import { CARD_TYPE, SIDE, ENVIRONMENT } from '../Card/utils/constant'
 import { PHASE, PHASE_START } from '../PlayerGround/utils/constant'
 import { emit_change_phase } from '../../Client/Sender'
+import { logEvent, LOG_TYPE, setLogTurn } from '../../data/duelLog';
 import Field from './Field/Field.jsx';
 import Hand from './Hand/Hand.jsx';
+import DuelLog from './DuelLog/DuelLog';
 import Settings from './Settings/Settings.jsx';
 import PhaseSelector from './PhaseSelector/PhaseSelector'
 import HealthBar from './HealthBar/HealthBar'
@@ -89,15 +91,24 @@ class Game extends React.Component {
         const current_turn = game_meta.current_turn;
         const is_my_turn = my_id === current_turn;
 
-        // Tab title + CPU turn trigger
+        // Log phase transitions
+        if (current_phase !== prevProps.game_meta.current_phase) {
+            const who = is_my_turn ? 'Your' : "Opponent's";
+            logEvent(LOG_TYPE.PHASE, `${who} ${current_phase.replace(/_/g, ' ')}`, { phase: current_phase });
+        }
+
+        // Log turn changes and update turn counter for the log
         if (current_turn !== prevProps.game_meta.current_turn) {
+            setLogTurn(game_meta.turn_count || 1);
             if (is_my_turn) {
                 document.hidden
                     ? this.startTabFlash('⚔️ Your Turn!')
                     : (document.title = '⚔️ Your Turn! — Duel Disk OS');
+                logEvent(LOG_TYPE.SYSTEM, '--- Your turn begins ---');
             } else {
                 this.stopTabFlash();
                 document.title = "Opponent's Turn — Duel Disk OS";
+                logEvent(LOG_TYPE.SYSTEM, "--- Opponent's turn begins ---");
             }
             if (this.props.onTurnChange) {
                 this.props.onTurnChange(current_turn, my_id);
@@ -115,6 +126,7 @@ class Game extends React.Component {
                     side: is_my_turn ? SIDE.MINE : SIDE.OPPONENT,
                     amount: 1
                 });
+                if (is_my_turn) logEvent(LOG_TYPE.DRAW, 'You drew a card');
                 // Clear per-turn position flags for the active player's monsters
                 const activeSide = is_my_turn ? SIDE.MINE : SIDE.OPPONENT;
                 const field = environment?.[activeSide]?.[ENVIRONMENT.MONSTER_FIELD];
@@ -225,6 +237,7 @@ class Game extends React.Component {
                     <HealthBar side='MINE' />
                     <HealthBar side='OPPONENT' />
                     <PhaseSelector />
+                    <DuelLog />
                     <div className="hand_field_container">
                         <Hand side='OPPONENT' />
                         <div className="field_container">

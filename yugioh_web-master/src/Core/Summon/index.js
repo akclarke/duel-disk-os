@@ -6,6 +6,7 @@ import { move_cards_to_graveyard } from '../Misc'
 import store from "../../Store/store";
 import { update_environment } from "../../Store/actions/environmentActions";
 import { get_unique_id_from_ennvironment } from "../../Components/PlayerGround/utils/utils";
+import { logEvent, LOG_TYPE } from '../../data/duelLog';
 
 const summon = (info, type, environment) => {
     const cardType = info.card.card?.card_type || info.card.card_type;
@@ -43,6 +44,20 @@ const summon = (info, type, environment) => {
 
     if (info.side === SIDE.MINE) {
         emit_summon(info, type);
+    }
+
+    const cardName = info.card?.card?.name || info.card?.name || '?';
+    const who = info.side === SIDE.MINE ? 'You' : 'Opponent';
+    if (type === SET_SUMMON) {
+        logEvent(LOG_TYPE.SET, `${who} Set a card face-down`, { cardName, side: info.side });
+    } else if (isSpellOrTrap) {
+        logEvent(LOG_TYPE.SUMMON, `${who} played ${cardName}`, { cardName, side: info.side });
+    } else if (info.src_location === ENVIRONMENT.EXTRA_DECK) {
+        logEvent(LOG_TYPE.SPECIAL, `${who} Special Summoned ${cardName} from Extra Deck`, { cardName, side: info.side });
+    } else if (info.src_location === ENVIRONMENT.HAND) {
+        logEvent(LOG_TYPE.SUMMON, `${who} Normal Summoned ${cardName}`, { cardName, side: info.side });
+    } else {
+        logEvent(LOG_TYPE.SPECIAL, `${who} Special Summoned ${cardName}`, { cardName, side: info.side });
     }
 
     store.dispatch(update_environment(environment));
@@ -113,10 +128,15 @@ const sendToGY = (ids, side, src, environment) => {
  * DEF→ATK and →SET are card-effect-only — call this directly from effect code.
  */
 const changePosition = (cardEnv, newPos, environment) => {
-    if (cardEnv.current_pos === CARD_POS.FACE && newPos === CARD_POS.DEFENSE) {
+    const oldPos = cardEnv.current_pos;
+    if (oldPos === CARD_POS.FACE && newPos === CARD_POS.DEFENSE) {
         cardEnv.pos_changed_this_turn = true;
     }
     cardEnv.current_pos = newPos;
+    const name = cardEnv.card?.name || '?';
+    const posLabel = { [CARD_POS.FACE]: 'ATK', [CARD_POS.DEFENSE]: 'DEF (face-up)', [CARD_POS.SET]: 'DEF (face-down)' };
+    const action = oldPos === CARD_POS.SET ? 'Flip Summoned' : 'changed position:';
+    logEvent(LOG_TYPE.POSITION, `${name} ${action} ${posLabel[newPos] || newPos}`, { cardName: name });
     store.dispatch(update_environment({ ...environment }));
 };
 

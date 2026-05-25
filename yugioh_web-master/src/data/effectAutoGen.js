@@ -18,6 +18,7 @@ import { TOOL_TYPE } from '../Store/actions/actionTypes';
 import { show_tool } from '../Store/actions/toolActions';
 import store from '../Store/store';
 import { update_environment } from '../Store/actions/environmentActions';
+import { logEvent, LOG_TYPE } from './duelLog';
 
 // ─── SHARED HELPERS ───────────────────────────────────────────────────────────
 
@@ -94,6 +95,14 @@ const matchDestroyOpponent = (desc) =>
  */
 const matchDestroy1 = (desc) =>
     /destroy\s+1\s+(?:monster|spell|trap|card)/i.test(desc);
+
+/**
+ * Detect on-summon triggered effects.
+ * Matches: "When this card is Normal or Special Summoned",
+ *          "When this card is Summoned", etc.
+ */
+const matchOnSummonTrigger = (desc) =>
+    /when\s+this\s+card\s+is\s+(?:normal(?:ly)?\s+or\s+special(?:ly)?\s+)?summon(?:ed)?/i.test(desc);
 
 // ─── EFFECT BUILDERS ─────────────────────────────────────────────────────────
 
@@ -224,17 +233,70 @@ const makeDestroy1Effect = () => ({
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 
 /**
+ * Build an on_summon handler for a card whose description matches an
+ * on-summon trigger pattern. Returns null if no effect matches.
+ */
+const makeOnSummonEffect = (desc, cardName) => {
+    const dmg = matchDealDamage(desc);
+    if (dmg) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — inflict ${dmg} damage`, { cardName });
+            env[SIDE.OPPONENT].hp = Math.max(0, (env[SIDE.OPPONENT].hp || 0) - dmg);
+            dispatchEnv(env);
+        };
+    }
+    const gainLP = matchGainLP(desc);
+    if (gainLP) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — gain ${gainLP} LP`, { cardName });
+            env[SIDE.MINE].hp = (env[SIDE.MINE].hp || 0) + gainLP;
+            dispatchEnv(env);
+        };
+    }
+    const drawN = matchDraw(desc);
+    if (drawN) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — draw ${drawN}`, { cardName });
+            for (let i = 0; i < drawN; i++) {
+                const deck = env[SIDE.MINE][ENVIRONMENT.DECK];
+                if (!deck.length) break;
+                env[SIDE.MINE][ENVIRONMENT.HAND].push(deck.pop());
+            }
+            dispatchEnv(env);
+        };
+    }
+    return null;
+};
+
+/**
  * Try to auto-generate an effect for a card from its description.
  * Returns an effects array (same shape as EFFECTS_REGISTRY values) or null.
  *
- * Priority order: draw > gain LP > deal damage > destroy all > destroy opp >
- *                 destroy 1 > search.
- * A card can only match ONE pattern — the first that succeeds wins.
+ * On-summon triggered effects (detected via "When this card is ... Summoned:")
+ * are returned as { on_summon: fn } so Core/Summon fires them automatically.
+ *
+ * Activated effects priority: draw > gain LP > deal damage > destroy all >
+ *   destroy opp > destroy 1 > search.
  */
 export const autoGenEffect = (id, card) => {
     const desc = card?.description || card?.desc || '';
     if (!desc) return null;
+    const name = card?.name || String(id);
 
+    // ── On-summon triggered effects ───────────────────────────────────────────
+    if (matchOnSummonTrigger(desc)) {
+        const fn = makeOnSummonEffect(desc, name);
+        if (fn) {
+            return [{ on_summon: fn }];
+        }
+        // Matched trigger text but no recognised effect — log for debugging
+        logEvent(LOG_TYPE.EFFECT_FAIL,
+            `${name}: on-summon trigger detected but effect not auto-generated (needs manual entry)`,
+            { cardName: name });
+        return null;
+    }
+
+    // ── Activated effects ─────────────────────────────────────────────────────
     const drawN = matchDraw(desc);
     if (drawN) return [makeDrawEffect(drawN)];
 
