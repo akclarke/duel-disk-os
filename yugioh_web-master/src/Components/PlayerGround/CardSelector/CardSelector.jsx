@@ -15,8 +15,32 @@ class CardSelector extends React.Component {
     componentDidUpdate(prevProps) {
         if (!prevProps.show_card_selector && this.props.show_card_selector) {
             this.setState({ selected_cards: {}, num_selected: 0 });
+            // If it's not the player's turn the CPU triggered this — auto-resolve
+            const { game_meta, my_id } = this.props;
+            if (game_meta && my_id && game_meta.current_turn !== my_id) {
+                setTimeout(() => this._autoResolve(), 500);
+            }
         }
     }
+
+    _autoResolve = () => {
+        const { card_selector_info, show_card_selector } = this.props;
+        if (!show_card_selector || !card_selector_info?.type) return;
+        const content = this.getContent();
+        const { cards, num } = content;
+        const close_info = { tool_type: TOOL_TYPE.CARD_SELECTOR };
+        if (!cards || cards.length === 0) {
+            card_selector_info.reject?.('no_cards');
+            this.props.dispatch_close_tool(close_info);
+            return;
+        }
+        const autoSelected = {};
+        cards.slice(0, num).forEach(c => {
+            autoSelected[get_unique_id_from_ennvironment(c)] = true;
+        });
+        card_selector_info.resolve({ cardEnvs: Object.keys(autoSelected), side: SIDE.MINE });
+        this.props.dispatch_close_tool(close_info);
+    };
 
     toggle = (uid, maxSelect) => {
         const { selected_cards, num_selected } = this.state;
@@ -267,6 +291,10 @@ class CardSelector extends React.Component {
     }
 }
 
-const mapStateToProps = state => ({ environment: state.environmentReducer.environment });
+const mapStateToProps = state => ({
+    environment: state.environmentReducer.environment,
+    game_meta: state.gameMetaReducer.game_meta,
+    my_id: state.serverReducer.my_id,
+});
 const mapDispatchToProps = dispatch => ({ dispatch_close_tool: (info) => dispatch(close_tool(info)) });
 export default connect(mapStateToProps, mapDispatchToProps)(CardSelector);

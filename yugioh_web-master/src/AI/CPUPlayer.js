@@ -6,10 +6,11 @@
 import store from '../Store/store';
 import { change_phase } from '../Store/actions/gameMetaActions';
 import { direct_attack, others_attack } from '../Store/actions/battleMetaActions';
+import { show_tool } from '../Store/actions/toolActions';
 import Core from '../Core';
 import { ENVIRONMENT, SIDE, CARD_TYPE, CARD_POS } from '../Components/Card/utils/constant';
 import { PHASE, DST_DIRECT_ATTACK } from '../Components/PlayerGround/utils/constant';
-import { NORMAL_SUMMON } from '../Store/actions/actionTypes';
+import { NORMAL_SUMMON, TOOL_TYPE } from '../Store/actions/actionTypes';
 import { get_unique_id_from_ennvironment } from '../Components/PlayerGround/utils/utils';
 
 const THINK_DELAY = 800;
@@ -17,6 +18,20 @@ const PHASE_DELAY = 1400;
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
 const getEnv = () => store.getState().environmentReducer.environment;
+
+// Offer the player a chance to activate a face-down S/T in response to a CPU action.
+// Returns a Promise that resolves when the player passes or activates.
+const offerChainToPlayer = (playerSide, triggerName) => {
+    const spellField = getEnv()[playerSide][ENVIRONMENT.SPELL_FIELD] || [];
+    const faceDown = spellField.filter(c => c?.card && c.current_pos === CARD_POS.SET);
+    if (faceDown.length === 0) return Promise.resolve({ activated: false });
+    return new Promise(resolve =>
+        store.dispatch(show_tool({
+            tool_type: TOOL_TYPE.CHAIN_WINDOW,
+            info: { cards: faceDown, triggerName, resolve },
+        }))
+    );
+};
 
 const getMonsters = (env, side) =>
     (env[side][ENVIRONMENT.MONSTER_FIELD] || [])
@@ -89,6 +104,11 @@ class CPUPlayer {
             getEnv()
         );
         this._normalSummonUsed = true;
+
+        // Let the player respond with a face-down trap/quick-play
+        const playerSide = this.side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE;
+        await offerChainToPlayer(playerSide, `${best.card.name} was Normal Summoned`);
+
         return true;
     }
 

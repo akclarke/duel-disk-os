@@ -7,10 +7,12 @@ import { connect } from 'react-redux';
 import { ENVIRONMENT, SIDE, CARD_TYPE } from '../../Card/utils/constant';
 
 const ZONE_LABELS = {
-    gy_mine: '🪦 My Graveyard',
-    gy_opp: "🪦 Opponent's Graveyard",
-    extra_mine: '📘 My Extra Deck',
-    extra_opp: "📘 Opponent's Extra Deck",
+    gy_mine:        '🪦 My Graveyard',
+    gy_opp:         "🪦 Opponent's Graveyard",
+    extra_mine:     '📘 My Extra Deck',
+    extra_opp:      "📘 Opponent's Extra Deck",
+    pendulum_mine:  '🔮 My Pendulum Zones',
+    pendulum_opp:   "🔮 Opponent's Pendulum Zones",
 };
 
 class ZoneViewer extends React.Component {
@@ -18,10 +20,12 @@ class ZoneViewer extends React.Component {
         const { zone, environment } = this.props;
         if (!environment || !zone) return [];
         switch (zone) {
-            case 'gy_mine':    return environment[SIDE.MINE][ENVIRONMENT.GRAVEYARD] || [];
-            case 'gy_opp':     return environment[SIDE.OPPONENT][ENVIRONMENT.GRAVEYARD] || [];
-            case 'extra_mine': return environment[SIDE.MINE][ENVIRONMENT.EXTRA_DECK] || [];
-            case 'extra_opp':  return environment[SIDE.OPPONENT][ENVIRONMENT.EXTRA_DECK] || [];
+            case 'gy_mine':        return environment[SIDE.MINE][ENVIRONMENT.GRAVEYARD] || [];
+            case 'gy_opp':         return environment[SIDE.OPPONENT][ENVIRONMENT.GRAVEYARD] || [];
+            case 'extra_mine':     return environment[SIDE.MINE][ENVIRONMENT.EXTRA_DECK] || [];
+            case 'extra_opp':      return environment[SIDE.OPPONENT][ENVIRONMENT.EXTRA_DECK] || [];
+            case 'pendulum_mine':  return (environment[SIDE.MINE][ENVIRONMENT.PENDULUM_ZONE] || []).filter(Boolean);
+            case 'pendulum_opp':   return (environment[SIDE.OPPONENT][ENVIRONMENT.PENDULUM_ZONE] || []).filter(Boolean);
             default: return [];
         }
     };
@@ -81,6 +85,25 @@ class ZoneViewer extends React.Component {
                                                 <div style={{ color: '#888', fontSize: 10 }}>
                                                     Lv{c.level} · {c.atk ?? '?'}/{c.def ?? '?'}
                                                 </div>
+                                            )}
+                                            {c.scale != null && (
+                                                <div style={{ color: '#c080ff', fontSize: 10, marginTop: 2 }}>
+                                                    Scale: {c.scale}
+                                                </div>
+                                            )}
+                                            {/* Pendulum zone effect activation */}
+                                            {zone === 'pendulum_mine' && c.pendulumEffect && (
+                                                <button onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const env = this.props.environment;
+                                                    if (typeof c.pendulumEffect === 'function') {
+                                                        c.pendulumEffect(env, cardEnv);
+                                                    }
+                                                }} style={{
+                                                    marginTop: 4, width: '100%', background: '#2a1a4a',
+                                                    border: '1px solid #6040a0', color: '#c080ff',
+                                                    borderRadius: 4, padding: '3px 0', fontSize: 9, cursor: 'pointer'
+                                                }}>⚡ Activate</button>
                                             )}
                                         </div>
                                     </div>

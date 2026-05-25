@@ -16,6 +16,7 @@ import Settings from './Settings/Settings.jsx';
 import PhaseSelector from './PhaseSelector/PhaseSelector'
 import HealthBar from './HealthBar/HealthBar'
 import CardSelector from './CardSelector/CardSelector'
+import ChainWindow from './ChainWindow/ChainWindow'
 import PhaseAnimator from './PhaseSelector/PhaseAnimator'
 import './Game.css';
 import { TOOL_TYPE } from '../../Store/actions/actionTypes';
@@ -145,8 +146,14 @@ class Game extends React.Component {
             } else if (current_phase === PHASE.STANDBY_PHASE) {
                 if (is_my_turn) this.auto_next_phase(PHASE.MAIN_PHASE_1);
             } else if (current_phase === PHASE.END_PHASE) {
-                // Always advance — turn has already swapped in gameMetaReducer
-                this.auto_next_phase(PHASE_START);
+                if (is_my_turn) {
+                    // Trigger end-phase pendulum effects, then advance
+                    this.triggerEndPhasePendulumEffects(environment).then(() => {
+                        this.auto_next_phase(PHASE_START);
+                    });
+                } else {
+                    this.auto_next_phase(PHASE_START);
+                }
             }
         }
     }
@@ -201,6 +208,25 @@ class Game extends React.Component {
         this.props.initialize(environment);
     }
 
+    triggerEndPhasePendulumEffects = async (environment) => {
+        const pendZone = environment?.[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE] || [];
+        for (const cardEnv of pendZone) {
+            if (!cardEnv?.card?.pendulumEffect) continue;
+            const cardName = cardEnv.card.name;
+            const pendDesc = cardEnv.card.pendDesc || '(Pendulum effect)';
+            const wantsToActivate = window.confirm(
+                `End Phase — Activate ${cardName}'s Pendulum Effect?\n\n${pendDesc}`
+            );
+            if (wantsToActivate) {
+                try {
+                    await cardEnv.card.pendulumEffect(environment, cardEnv);
+                } catch (e) {
+                    console.warn('[Game] Pendulum end effect error:', e);
+                }
+            }
+        }
+    };
+
     getTransformRotateXValue = (event, value) => {
         const valueString = `${value}deg`;
         if (valueString !== this.state.transformRotateX) this.setState({ transformRotateX: valueString });
@@ -234,6 +260,7 @@ class Game extends React.Component {
                         show_card_selector={tools[TOOL_TYPE.CARD_SELECTOR].status}
                         card_selector_info={tools[TOOL_TYPE.CARD_SELECTOR].info}
                     />
+                    <ChainWindow />
                     <HealthBar side='MINE' />
                     <HealthBar side='OPPONENT' />
                     <PhaseSelector />

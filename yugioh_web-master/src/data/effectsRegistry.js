@@ -16,6 +16,7 @@ import { show_tool } from '../Store/actions/toolActions';
 import store from '../Store/store';
 import { update_environment } from '../Store/actions/environmentActions';
 import { get_unique_id_from_ennvironment } from '../Components/PlayerGround/utils/utils';
+import { logEvent, LOG_TYPE } from './duelLog';
 
 import {
     // Operations
@@ -403,4 +404,63 @@ export const EFFECTS_REGISTRY = {
     // Elemental HERO Wildedge — Wildheart + Bladedge
     // Dark Paladin — Dark Magician + Buster Blader
     // (handled by Polymerization / Miracle Fusion logic — no effect entry needed)
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ── PENDULUM MONSTERS ────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+
+    // Odd-Eyes Pendulum Dragon (16178681)
+    // Pendulum Effect: "Once per turn, during your End Phase: You can destroy this card,
+    // and if you do, add 1 Pendulum Monster with 1500 or less ATK from your Deck to your hand."
+    16178681: [{
+        pendulumEffect: async (env, cardEnv) => {
+            const deckPendulums = (env[SIDE.MINE][ENVIRONMENT.DECK] || [])
+                .filter(c => c?.card?.card_type === 'MONSTER_PENDULUM' && (c.card.atk ?? 9999) <= 1500);
+
+            if (deckPendulums.length === 0) {
+                alert('No Pendulum Monsters with 1500 or less ATK in your Deck.');
+                return;
+            }
+
+            let result;
+            try {
+                result = await openSelector({
+                    type: CARD_SELECT_TYPE.CARD_SELECT_FROM_DECK,
+                    label: 'Odd-Eyes: Add 1 Pendulum Monster (≤1500 ATK) from Deck to Hand',
+                    numToSelect: 1,
+                    filterFn: c => c?.card?.card_type === 'MONSTER_PENDULUM' && (c.card.atk ?? 9999) <= 1500,
+                });
+            } catch {
+                return; // player cancelled
+            }
+
+            if (!result?.cardEnvs?.length) return;
+
+            const freshEnv = store.getState().environmentReducer.environment;
+
+            // Move chosen card from deck to hand
+            const deck = freshEnv[SIDE.MINE][ENVIRONMENT.DECK];
+            for (const uid of result.cardEnvs) {
+                const idx = deck.findIndex(c => get_unique_id_from_ennvironment(c) === uid);
+                if (idx !== -1) {
+                    const [found] = deck.splice(idx, 1);
+                    freshEnv[SIDE.MINE][ENVIRONMENT.HAND].push(found);
+                    logEvent(LOG_TYPE.EFFECT, `Odd-Eyes Pendulum Dragon: added ${found.card?.name} to hand`);
+                }
+            }
+
+            // Remove Odd-Eyes from pendulum zone and send to GY
+            const pendZone = freshEnv[SIDE.MINE][ENVIRONMENT.PENDULUM_ZONE];
+            for (let i = 0; i < pendZone.length; i++) {
+                if (pendZone[i]?.card?.key === 16178681) {
+                    freshEnv[SIDE.MINE][ENVIRONMENT.GRAVEYARD].push(pendZone[i]);
+                    pendZone[i] = null;
+                    logEvent(LOG_TYPE.EFFECT, 'Odd-Eyes Pendulum Dragon: destroyed from Pendulum Zone');
+                    break;
+                }
+            }
+
+            store.dispatch(update_environment(freshEnv));
+        },
+    }],
 };

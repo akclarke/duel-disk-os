@@ -66,6 +66,7 @@ const buildMonsterCard = (id, apiCard, cardType) => {
     if (cardType === CARD_TYPE.MONSTER.PENDULUM) {
         card.scale = apiCard.scale ?? 0;
         card.pendDesc = apiCard.pend_desc || '';
+        card.pendulumEffect = effects[0]?.pendulumEffect ?? null;
         // Pendulum monsters cannot be normal summoned (they are placed to the pendulum zone)
         card.can_normal_summon = () => false;
     }
