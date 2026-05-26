@@ -249,11 +249,12 @@ export const EFFECTS_REGISTRY = {
             const edIdx = (env[SIDE.MINE][ENVIRONMENT.EXTRA_DECK] || [])
                 .findIndex(c => get_unique_id_from_ennvironment(c) === targetUid);
             if (edIdx !== -1) env[SIDE.MINE][ENVIRONMENT.EXTRA_DECK].splice(edIdx, 1);
+            const wantsDef = window.confirm('Summon in Defense position? (Cancel = Attack position)');
             const field = env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
             const priorities = [2, 3, 1, 4, 0];
             for (const slot of priorities) {
                 if (field[slot] === CARD_TYPE.PLACEHOLDER) {
-                    target.current_pos = CARD_POS.FACE;
+                    target.current_pos = wantsDef ? CARD_POS.DEFENSE : CARD_POS.FACE;
                     field[slot] = target;
                     break;
                 }

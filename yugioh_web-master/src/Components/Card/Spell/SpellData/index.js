@@ -84,13 +84,14 @@ export const spell_database = {
                         //force update
                         store.dispatch(update_environment(environment))
         
+                        const wantsDef = window.confirm('Summon in Defense position? (Cancel = Attack position)');
                         const info = {
                             card: Core.Utils.get_cardEnv_by_unique_id(environment, SIDE.MINE, ENVIRONMENT.EXTRA_DECK, result.cardEnvs[0]),
                             src_location: ENVIRONMENT.EXTRA_DECK,
-                            side: SIDE.MINE
+                            side: SIDE.MINE,
+                            position: wantsDef ? 'DEFENSE' : 'FACE',
                         }
-        
-                        // TODO: change to fusion summon
+
                         Core.Summon.summon(info, NORMAL_SUMMON, environment)
                         operation_resolve();
                     })
