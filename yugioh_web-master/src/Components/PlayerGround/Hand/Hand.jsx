@@ -136,22 +136,21 @@ class Hand extends React.Component {
         this.setState({ cardClicked: -1 });
     }
 
-    // ── Pendulum Scale Placement ─────────────────────────────────────────────
-    placeScaleOnClick = (cardEnv) => (event) => {
-        event.stopPropagation();
+    // ── Pendulum Zone Placement (face-up activation = Scale, face-down = Set) ──
+    _placeToPendulumZone = (cardEnv, faceDown) => {
         const { environment } = this.props;
         const zones = environment[SIDE.MINE][ENVIRONMENT.PENDULUM_ZONE] || [null, null];
-        // Place left first, then right
         const slotIndex = zones[0] === null ? 0 : zones[1] === null ? 1 : null;
         if (slotIndex === null) {
             alert('Both Pendulum Zones are occupied. Remove one first.');
             return;
         }
+        const placed = { ...cardEnv, current_pos: faceDown ? CARD_POS.SET : CARD_POS.FACE };
         const freshEnv = {
             ...environment,
             [SIDE.MINE]: {
                 ...environment[SIDE.MINE],
-                [ENVIRONMENT.PENDULUM_ZONE]: zones.map((z, i) => i === slotIndex ? cardEnv : z),
+                [ENVIRONMENT.PENDULUM_ZONE]: zones.map((z, i) => i === slotIndex ? placed : z),
                 [ENVIRONMENT.HAND]: environment[SIDE.MINE][ENVIRONMENT.HAND].filter(c => c !== cardEnv),
             }
         };
@@ -159,6 +158,16 @@ class Hand extends React.Component {
         const storeModule = require('../../../Store/store');
         storeModule.default.dispatch(update_environment(freshEnv));
         this.setState({ cardClicked: -1 });
+    };
+
+    placeScaleOnClick = (cardEnv) => (event) => {
+        event.stopPropagation();
+        this._placeToPendulumZone(cardEnv, false); // face-up
+    }
+
+    setInPendulumZone = (cardEnv) => (event) => {
+        event.stopPropagation();
+        this._placeToPendulumZone(cardEnv, true); // face-down
     }
 
     // ── Synchro Summon (called from PhaseSelector area) ──────────────────────
@@ -278,8 +287,7 @@ class Hand extends React.Component {
                             const can_summon = is_my_turn && is_main_phase && 
                                 cardEnv.card.can_normal_summon(cardEnv.card, environment)
                             const can_normal_summon = can_summon ? "show_summon" : "no_hand_option"
-                            // Pendulums can't be normal set face-down
-                            const can_set = can_summon && !isPendulum ? "show_summon" : "no_hand_option"
+                            const can_set = can_summon ? "show_summon" : "no_hand_option"
                             const isRitual = cardEnv.card.card_type === CARD_TYPE.MONSTER.RITUAL;
                             const can_special_summon = is_my_turn && is_main_phase && 
                                 cardEnv.card.can_special_summon(cardEnv.card, environment) 
@@ -310,7 +318,8 @@ class Hand extends React.Component {
                                                 ? <div className={canScale} onClick={this.placeScaleOnClick(cardEnv)}>Scale</div>
                                                 : <div className={can_special_summon}>Special</div>
                                         }
-                                        <div className={can_set} onClick={this.summonOnclick(info, SET_SUMMON)}>Set</div>
+                                        {/* Pendulums set face-down into the Pendulum Zone; other monsters into the monster zone */}
+                                        <div className={can_set} onClick={isPendulum ? this.setInPendulumZone(cardEnv) : this.summonOnclick(info, SET_SUMMON)}>Set</div>
                                     </div>
                                     <CardView card={cardEnv} />
                                 </div>
