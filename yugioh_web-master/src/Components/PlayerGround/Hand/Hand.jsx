@@ -13,6 +13,7 @@ import './Hand.css'
 import { get_unique_id_from_ennvironment } from '../utils/utils';
 import { NORMAL_SUMMON, SET_SUMMON, TOOL_TYPE } from '../../../Store/actions/actionTypes';
 import { show_tool } from '../../../Store/actions/toolActions';
+import { choosePosition } from '../../../data/positionChooser';
 
 class Hand extends React.Component {
     constructor(props) {
@@ -84,6 +85,24 @@ class Hand extends React.Component {
         this.setState({cardClicked: -1});
         event.stopPropagation();
     }
+
+    handSpecialSummonOnClick = (cardEnv) => async (event) => {
+        event.stopPropagation();
+        const { environment } = this.props;
+        const effects = cardEnv.card?.effects || [];
+        const ssEffect = effects.find(e => e.can_hand_ss);
+        if (!ssEffect || !ssEffect.can_hand_ss(cardEnv.card, environment)) return;
+
+        // Some cards need a cost paid before summoning (e.g. banish from GY)
+        if (ssEffect.pre_summon_cost) {
+            const paid = await ssEffect.pre_summon_cost(environment, cardEnv);
+            if (!paid) return;
+        }
+
+        const info = { side: SIDE.MINE, card: cardEnv, src_location: ENVIRONMENT.HAND };
+        this.summon_final(info, 'SPECIAL_SUMMON', event);
+        this.setState({ cardClicked: -1 });
+    };
 
     // ── Selector helper (mirrors Poly pattern) ──────────────────────────────
     openSelector = (selectorInfo) =>
@@ -157,6 +176,13 @@ class Hand extends React.Component {
         const { update_environment } = require('../../../Store/actions/environmentActions');
         const storeModule = require('../../../Store/store');
         storeModule.default.dispatch(update_environment(freshEnv));
+
+        // Fire ON_PENDULUM_PLACED trigger for face-up placements (activated as scale)
+        if (!faceDown) {
+            const { fireTrigger, TRIGGER_TYPE } = require('../../../data/triggerRegistry');
+            fireTrigger(TRIGGER_TYPE.ON_PENDULUM_PLACED, placed, freshEnv, SIDE.MINE);
+        }
+
         this.setState({ cardClicked: -1 });
     };
 
@@ -202,10 +228,10 @@ class Hand extends React.Component {
 
             // Send materials to GY (pendulums auto-redirect to extra deck in move_cards_to_graveyard)
             Core.Summon.tribute(materialIds, SIDE.MINE, ENVIRONMENT.MONSTER_FIELD, environment);
-            const defPos = window.confirm('Summon in Defense position? (Cancel = Attack position)');
+            const pos = await choosePosition(target.card?.name || 'Monster');
             const info = {
                 side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK,
-                position: defPos ? 'DEFENSE' : 'FACE',
+                position: pos,
             };
             Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
         } catch (e) { /* cancelled */ }
@@ -251,10 +277,10 @@ class Hand extends React.Component {
             }
             target.xyz_materials = attachedMaterials;
 
-            const defPos = window.confirm('Summon in Defense position? (Cancel = Attack position)');
+            const pos = await choosePosition(target.card?.name || 'Monster');
             const info = {
                 side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK,
-                position: defPos ? 'DEFENSE' : 'FACE',
+                position: pos,
             };
             Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
         } catch (e) { /* cancelled */ }
@@ -316,7 +342,7 @@ class Hand extends React.Component {
                                             ? <div className={can_ritual} onClick={this.ritualSummonOnClick(cardEnv)}>Ritual</div>
                                             : isPendulum
                                                 ? <div className={canScale} onClick={this.placeScaleOnClick(cardEnv)}>Scale</div>
-                                                : <div className={can_special_summon}>Special</div>
+                                                : <div className={can_special_summon} onClick={this.handSpecialSummonOnClick(cardEnv)}>Special</div>
                                         }
                                         {/* Pendulums set face-down into the Pendulum Zone; other monsters into the monster zone */}
                                         <div className={can_set} onClick={isPendulum ? this.setInPendulumZone(cardEnv) : this.summonOnclick(info, SET_SUMMON)}>Set</div>

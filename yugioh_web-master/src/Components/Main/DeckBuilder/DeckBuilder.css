@@ -1,0 +1,314 @@
+.db_container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a0a1a 100%);
+    color: white;
+    font-family: Lato, sans-serif;
+    overflow: hidden;
+}
+
+/* ── Header ── */
+.db_header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    flex-shrink: 0;
+}
+.db_header h2 { font-size: 1.3rem; font-weight: 800; margin: 0; color: #f0c040; }
+
+.db_back_btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: white; padding: 7px 16px; border-radius: 8px;
+    cursor: pointer; font-size: 0.9rem; font-family: Lato, sans-serif;
+    transition: background 0.15s;
+}
+.db_back_btn:hover { background: rgba(255,255,255,0.15); }
+
+/* ── Body: 3 columns ── */
+.db_body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* ══════════════════════════════════════════════════════
+   LEFT: Card info panel
+   ══════════════════════════════════════════════════════ */
+.db_info {
+    width: 210px; min-width: 190px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 12px 10px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    overflow-y: auto;
+    background: rgba(0,0,0,0.18);
+}
+.db_info_empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; color: #444; text-align: center; gap: 10px;
+}
+.db_info_empty_icon { font-size: 2.4rem; opacity: 0.4; }
+.db_info_empty p { font-size: 0.8rem; line-height: 1.6; margin: 0; }
+
+.db_info_img { width: 100%; border-radius: 7px; display: block; box-shadow: 0 4px 14px rgba(0,0,0,0.6); }
+.db_info_name { font-size: 0.78rem; font-weight: 800; color: #f0c040; line-height: 1.3; }
+.db_info_type { font-size: 0.68rem; color: #88aacc; }
+.db_info_stats { display: flex; flex-wrap: wrap; gap: 5px; font-size: 0.68rem; color: #a0c0ff; font-weight: 700; }
+.db_info_stats span { background: rgba(255,255,255,0.07); border-radius: 4px; padding: 2px 5px; }
+.db_info_desc { font-size: 0.68rem; color: #bbb; line-height: 1.5; overflow-y: auto; max-height: 180px; }
+.db_info_add_btn {
+    width: 100%; padding: 8px 0;
+    background: #f0c040; border: none; color: #1a1a1a;
+    font-size: 0.78rem; font-weight: 800; border-radius: 7px;
+    cursor: pointer; font-family: Lato, sans-serif; transition: background 0.15s; margin-top: 2px;
+}
+.db_info_add_btn:hover:not(:disabled) { background: #ffd060; }
+.db_info_add_btn.maxed, .db_info_add_btn:disabled { background: rgba(255,255,255,0.1); color: #5a8a5a; cursor: default; }
+.db_info_copies { text-align: center; font-size: 0.66rem; color: #777; }
+
+/* ══════════════════════════════════════════════════════
+   CENTER: Deck visual grid
+   ══════════════════════════════════════════════════════ */
+.db_center {
+    flex: 1; display: flex; flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden; min-width: 0;
+}
+
+/* Preset deck dropdown row */
+.db_preset_row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px 0;
+    flex-shrink: 0;
+}
+
+.db_preset_select {
+    flex: 1;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px;
+    color: #e8e8ff;
+    font-size: 0.78rem;
+    font-family: Lato, sans-serif;
+    padding: 5px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    /* Style dropdown arrow */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+.db_preset_select:hover { border-color: rgba(255,255,255,0.35); }
+.db_preset_select:focus { border-color: #f0c040; }
+.db_preset_select option {
+    background: #1a1a3a;
+    color: white;
+}
+
+/* Saved decks strip */
+.db_saved_section { padding: 9px 14px 0; flex-shrink: 0; }
+.db_saved_label { font-size: 0.65rem; font-weight: 800; color: #555; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+.db_saved_list { display: flex; flex-wrap: wrap; gap: 5px; }
+.db_saved_chip {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+    color: #ccc; padding: 3px 10px; border-radius: 20px; cursor: pointer;
+    font-size: 0.72rem; font-family: Lato, sans-serif;
+    white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+    transition: all 0.12s;
+}
+.db_saved_chip:hover { background: rgba(255,255,255,0.12); color: white; }
+.db_saved_chip.active { background: rgba(240,192,64,0.15); border-color: #f0c040; color: #f0c040; }
+.db_saved_new {
+    background: transparent; border: 1px dashed rgba(255,255,255,0.18); color: #555;
+    padding: 3px 10px; border-radius: 20px; cursor: pointer; font-size: 0.72rem; font-family: Lato, sans-serif;
+    transition: all 0.12s;
+}
+.db_saved_new:hover { border-color: rgba(255,255,255,0.38); color: #aaa; }
+
+.db_name_input {
+    margin: 9px 14px 0; padding: 8px 12px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; color: white; font-size: 0.9rem; font-family: Lato, sans-serif; outline: none;
+}
+.db_name_input:focus { border-color: #f0c040; }
+
+.db_tabs { display: flex; margin: 8px 14px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.db_tab {
+    flex: 1; background: none; border: none; color: #888;
+    padding: 7px 0; font-size: 0.82rem; font-family: Lato, sans-serif;
+    cursor: pointer; font-weight: 700; border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.db_tab:hover { color: #ccc; }
+.db_tab.active { color: #f0c040; border-bottom-color: #f0c040; }
+.db_count_ok   { color: #6e6; }
+.db_count_warn { color: #fa0; }
+
+/* Visual card grid */
+.db_deck_grid {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 6px; padding: 10px 14px 6px;
+}
+.db_deck_grid_empty {
+    color: #3a3a5a; font-size: 0.82rem;
+    text-align: center; padding: 40px 16px; line-height: 1.8; width: 100%;
+}
+
+.db_deck_card_tile {
+    position: relative; width: 72px; border-radius: 5px;
+    overflow: hidden; cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.12s, transform 0.12s;
+    background: rgba(255,255,255,0.04);
+    flex-shrink: 0;
+}
+.db_deck_card_tile:hover { border-color: #f0c040; transform: translateY(-2px); }
+.db_deck_card_tile:hover .db_deck_card_remove { opacity: 1; }
+
+.db_deck_card_img { width: 100%; display: block; }
+
+.db_deck_card_count {
+    position: absolute; top: 2px; left: 2px;
+    background: rgba(240,192,64,0.92); color: #000;
+    font-size: 9px; font-weight: 900; border-radius: 3px; padding: 0 3px;
+}
+
+.db_deck_card_remove {
+    position: absolute; top: 2px; right: 2px;
+    width: 18px; height: 18px;
+    background: rgba(180,30,30,0.88); border: none; color: #fff;
+    font-size: 14px; font-weight: 900; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; opacity: 0; transition: opacity 0.12s, background 0.1s;
+    line-height: 1;
+}
+.db_deck_card_remove:hover { background: rgba(220,50,50,0.95); }
+
+/* Action buttons */
+.db_actions {
+    display: flex; gap: 7px; padding: 10px 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0; align-items: center;
+}
+.db_copy_btn {
+    flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
+    color: #ccc; padding: 8px 0; border-radius: 8px; cursor: pointer;
+    font-size: 0.78rem; font-family: Lato, sans-serif; transition: background 0.15s;
+}
+.db_copy_btn:hover { background: rgba(255,255,255,0.13); color: white; }
+.db_save_btn {
+    flex: 1; background: #f0c040; border: none; color: #1a1a1a; padding: 8px 0;
+    border-radius: 8px; cursor: pointer; font-size: 0.78rem; font-weight: 800;
+    font-family: Lato, sans-serif; transition: background 0.15s;
+}
+.db_save_btn:hover { background: #ffd060; }
+.db_delete_btn {
+    background: rgba(200,40,40,0.2); border: 1px solid rgba(200,40,40,0.4);
+    color: #f88; padding: 8px 11px; border-radius: 8px; cursor: pointer;
+    font-size: 0.82rem; font-family: Lato, sans-serif; transition: background 0.15s;
+}
+.db_delete_btn:hover { background: rgba(200,40,40,0.4); }
+.db_save_msg { text-align: center; font-size: 0.78rem; color: #8f8; padding: 3px 14px 6px; }
+
+/* ══════════════════════════════════════════════════════
+   RIGHT: Compact search panel
+   ══════════════════════════════════════════════════════ */
+.db_right {
+    width: 300px; min-width: 260px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: rgba(255,255,255,0.02);
+    overflow: hidden;
+}
+
+.db_search_row { padding: 10px 12px 6px; flex-shrink: 0; }
+.db_search_input {
+    width: 100%; padding: 9px 12px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 10px; color: white; font-size: 0.88rem; font-family: Lato, sans-serif;
+    outline: none; box-sizing: border-box; transition: border-color 0.15s;
+}
+.db_search_input:focus { border-color: #f0c040; }
+.db_search_input::placeholder { color: #555; }
+
+.db_filters { display: flex; gap: 6px; padding: 0 12px 8px; flex-shrink: 0; }
+.db_filter_btn {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+    color: #999; padding: 4px 10px; border-radius: 20px;
+    cursor: pointer; font-size: 0.75rem; font-family: Lato, sans-serif; transition: all 0.15s;
+}
+.db_filter_btn:hover { background: rgba(255,255,255,0.12); color: white; }
+.db_filter_btn.active { background: rgba(240,192,64,0.15); border-color: #f0c040; color: #f0c040; }
+
+.db_status { padding: 24px 12px; text-align: center; color: #444; font-size: 0.82rem; }
+.db_error  { color: #e07070; }
+
+/* Compact list of search results */
+.db_search_list { flex: 1; overflow-y: auto; }
+
+.db_search_result_row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer; transition: background 0.1s;
+}
+.db_search_result_row:hover { background: rgba(255,255,255,0.05); }
+.db_search_result_row.maxed { opacity: 0.45; }
+
+.db_search_result_img_wrap { flex-shrink: 0; width: 36px; height: 52px; overflow: hidden; border-radius: 3px; }
+.db_search_result_thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.db_thumb_placeholder { background: rgba(255,255,255,0.06); }
+
+.db_search_result_info { flex: 1; min-width: 0; }
+.db_search_result_name {
+    font-size: 0.75rem; font-weight: 700; color: #ddd;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+}
+.db_search_result_meta { font-size: 0.65rem; color: #777; margin-top: 2px; }
+
+.db_search_result_copies { font-size: 0.7rem; color: #f0c040; font-weight: 800; min-width: 20px; text-align: center; }
+
+.db_search_add_btn {
+    flex-shrink: 0; width: 24px; height: 24px;
+    background: rgba(240,192,64,0.15); border: 1px solid rgba(240,192,64,0.4);
+    color: #f0c040; font-size: 14px; font-weight: 900; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: background 0.1s; line-height: 1;
+}
+.db_search_add_btn:hover:not(:disabled) { background: rgba(240,192,64,0.3); }
+.db_search_add_btn.maxed, .db_search_add_btn:disabled { background: rgba(0,180,0,0.15); border-color: rgba(0,180,0,0.4); color: #4a4; cursor: default; font-size: 10px; }
+
+/* ── Copy modal ── */
+.db_modal_overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 5000;
+    display: flex; align-items: center; justify-content: center;
+}
+.db_modal {
+    background: #12122a; border: 2px solid rgba(240,192,64,0.35);
+    border-radius: 14px; padding: 26px; width: 370px; max-height: 70vh;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+}
+.db_modal h3 { margin: 0; color: #f0c040; font-size: 1.05rem; }
+.db_copy_list { overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+.db_copy_item {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 9px 13px; cursor: pointer;
+    text-align: left; color: white; font-family: Lato, sans-serif; transition: background 0.12s;
+}
+.db_copy_item:hover { background: rgba(255,255,255,0.1); }
+.db_copy_item:disabled { opacity: 0.5; cursor: default; }
+.db_copy_icon { font-size: 1.25rem; }
+.db_copy_name { flex: 1; font-size: 0.88rem; font-weight: 700; }
+.db_copy_era  { font-size: 0.68rem; font-weight: 700; }
+.db_modal_close {
+    align-self: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+    color: #aaa; padding: 7px 22px; border-radius: 8px; cursor: pointer;
+    font-family: Lato, sans-serif; font-size: 0.82rem;
+}
+.db_modal_close:hover { background: rgba(255,255,255,0.12); }

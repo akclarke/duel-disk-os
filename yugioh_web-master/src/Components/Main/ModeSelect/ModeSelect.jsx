@@ -21,7 +21,7 @@ export const GAME_MODE = {
 
 class ModeSelect extends React.Component {
     render() {
-        const { onSelectMode } = this.props;
+        const { onSelectMode, onBuildDeck } = this.props;
 
         return (
             <div className="mode_select_container">
@@ -51,6 +51,53 @@ class ModeSelect extends React.Component {
                         <p>Watch two AI decks battle<br/>each other. Great for testing.</p>
                         <div className="mode_card_badge mode_badge_offline">OFFLINE</div>
                     </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginTop: 28, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {onBuildDeck && (
+                        <button
+                            onClick={onBuildDeck}
+                            style={{
+                                background: 'rgba(255,255,255,0.06)',
+                                border: '1px solid rgba(255,255,255,0.18)',
+                                color: '#aaa',
+                                padding: '10px 32px',
+                                borderRadius: 10,
+                                cursor: 'pointer',
+                                fontFamily: 'Lato, sans-serif',
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                letterSpacing: 0.5,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'white'; }}
+                            onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#aaa'; }}
+                        >
+                            🃏 Deck Builder
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => window.open('/gap-analysis.html', '_blank', 'noopener')}
+                        style={{
+                            background: 'rgba(30,40,80,0.5)',
+                            border: '1px solid rgba(100,120,255,0.35)',
+                            color: '#8899dd',
+                            padding: '10px 28px',
+                            borderRadius: 10,
+                            cursor: 'pointer',
+                            fontFamily: 'Lato, sans-serif',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            letterSpacing: 0.5,
+                            transition: 'all 0.15s',
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.background = 'rgba(50,60,120,0.6)'; e.currentTarget.style.color = '#aabbff'; e.currentTarget.style.borderColor = 'rgba(120,150,255,0.6)'; }}
+                        onMouseOut={e => { e.currentTarget.style.background = 'rgba(30,40,80,0.5)'; e.currentTarget.style.color = '#8899dd'; e.currentTarget.style.borderColor = 'rgba(100,120,255,0.35)'; }}
+                        title="View the rules gap analysis document"
+                    >
+                        📋 Gap Analysis
+                    </button>
                 </div>
             </div>
         );

@@ -1,15 +1,17 @@
 /**
  * effectAutoGen.js — src/data/effectAutoGen.js
  *
- * Pattern-matches a card's description text to produce a basic effect entry
+ * Pattern-matches a card's description text to produce effect entries
  * when no hand-written entry exists in effectsRegistry.js.
  *
- * This is intentionally conservative — it only generates effects whose text
- * has an unambiguous one-to-one mapping to a known operation (draw, gain LP,
- * damage, search, destroy). Cards with complex conditional logic still need
- * manual entries in effectsRegistry.js.
+ * Priority order for auto-generation:
+ *   1. On-summon triggered effects ("When this card is Summoned: …")
+ *   2. Once-per-turn field effects ("Once per turn: You can …")
+ *   3. Plain activated effects (draw / gainLP / damage / destroy / search / SS)
+ *   4. Fallback for unrecognized "Once per turn" — creates a log-only entry so
+ *      the "✦ Activate" button still appears and the player sees the effect text.
  *
- * Called by cardLoader.js as a fallback after EFFECTS_REGISTRY lookup.
+ * Called by cardLoader.js after EFFECTS_REGISTRY lookup.
  */
 
 import { ENVIRONMENT, SIDE, CARD_TYPE, CARD_POS } from '../Components/Card/utils/constant';
@@ -19,6 +21,7 @@ import { show_tool } from '../Store/actions/toolActions';
 import store from '../Store/store';
 import { update_environment } from '../Store/actions/environmentActions';
 import { logEvent, LOG_TYPE } from './duelLog';
+import { fireTrigger, TRIGGER_TYPE } from './triggerRegistry';
 
 // ─── SHARED HELPERS ───────────────────────────────────────────────────────────
 
@@ -29,23 +32,18 @@ const openSelector = (info) =>
         store.dispatch(show_tool({ tool_type: TOOL_TYPE.CARD_SELECTOR, info: { ...info, resolve, reject } }))
     );
 
+const getUid = (c) =>
+    c?.unique_count !== undefined ? `${c.card?.key}_${c.unique_count}` : c?.card?.key?.toString();
+
 // ─── PATTERN MATCHERS ─────────────────────────────────────────────────────────
 
-/**
- * Detect "draw N card(s)" patterns.
- * Handles: "draw 1 card", "draw 2 cards", "draw a card"
- */
 const matchDraw = (desc) => {
     const m = desc.match(/draw\s+(a|\d+)\s+card/i);
     if (!m) return null;
     const n = m[1].toLowerCase() === 'a' ? 1 : parseInt(m[1], 10);
-    if (!n || n > 5) return null; // sanity cap
-    return n;
+    return (!n || n > 5) ? null : n;
 };
 
-/**
- * Detect "gain N LP" / "gain N life points" patterns.
- */
 const matchGainLP = (desc) => {
     const m = desc.match(/gain\s+([\d,]+)\s*(lp|life\s*points?)/i);
     if (!m) return null;
@@ -53,9 +51,6 @@ const matchGainLP = (desc) => {
     return isNaN(n) ? null : n;
 };
 
-/**
- * Detect "take N damage" / "inflict N damage" patterns (opponent takes damage).
- */
 const matchDealDamage = (desc) => {
     const m = desc.match(/(?:inflict|deal|take|takes?)\s+([\d,]+)\s*(?:damage|points?\s*of\s*damage)/i);
     if (!m) return null;
@@ -63,88 +58,97 @@ const matchDealDamage = (desc) => {
     return isNaN(n) ? null : n;
 };
 
-/**
- * Detect "add 1 [type] monster from your Deck to your hand" (search effects).
- * Returns a filter object for openSelector.
- */
 const matchSearch = (desc) => {
-    if (!/add.{1,40}deck.{1,20}hand/i.test(desc)) return null;
-    const atkMatch = desc.match(/atk\s*[\d,]+\s*or\s*less|atk\s*of\s*([\d,]+)\s*or\s*less|([\d,]+)\s*or\s*less\s*atk/i);
+    if (!/add.{1,60}deck.{1,30}hand/i.test(desc)) return null;
     const filter = { type: 'MONSTER' };
-    if (atkMatch) {
-        const raw = atkMatch[1] || atkMatch[2] || '1500';
-        filter.atk = { max: parseInt(raw.replace(',', ''), 10) };
-    }
+    const atkM = desc.match(/(?:atk\s*[\d,]+\s*or\s*less|([\d,]+)\s*or\s*less\s*atk)/i);
+    if (atkM) filter.atk = { max: parseInt((atkM[1] || '1500').replace(',', ''), 10) };
+    // Archetype hints in quotes, e.g. add 1 "Gagaga" monster
+    const nameM = desc.match(/"([^"]+)"/);
+    if (nameM) filter.nameIncludes = nameM[1];
     return filter;
 };
 
-/**
- * Detect "destroy all monsters on the field" (field nuke).
- */
 const matchDestroyAll = (desc) =>
     /destroy\s+all\s+(?:monsters?\s+on\s+(?:the\s+)?(?:field|both\s+fields?)|(?:face[- ]?up\s+)?monsters?\s+(?:your\s+opponent\s+controls|on\s+(?:the\s+)?field))/i.test(desc);
 
-/**
- * Detect "destroy all monsters your opponent controls".
- */
 const matchDestroyOpponent = (desc) =>
     /destroy\s+all\s+(?:face[- ]?up\s+)?monsters?\s+(?:your\s+opponent\s+controls|on\s+your\s+opponent.{0,10}field)/i.test(desc);
 
-/**
- * Detect "destroy 1 monster" (target destroy).
- */
 const matchDestroy1 = (desc) =>
     /destroy\s+1\s+(?:monster|spell|trap|card)/i.test(desc);
 
+/** "Special Summon 1 [Level X or lower] monster from your hand" */
+const matchSSFromHand = (desc) => {
+    const lvM = desc.match(/special\s+summon\s+1\s+level\s+(\d+)\s+or\s+lower\s+(?:\S+\s+)*?monster\s+from\s+(?:your\s+)?hand/i);
+    if (lvM) return { maxLevel: parseInt(lvM[1], 10) };
+    if (/special\s+summon\s+1\s+(?:\S+\s+)*?monster\s+from\s+(?:your\s+)?hand/i.test(desc)) return {};
+    return null;
+};
+
+/** "Special Summon 1 monster from your Graveyard" */
+const matchSSFromGY = (desc) =>
+    /special\s+summon\s+1\s+(?:\S+\s+)*?monster\s+from\s+(?:your\s+)?(?:graveyard|gy)\b/i.test(desc) ? {} : null;
+
+/** "Special Summon 1 monster from your Deck" */
+const matchSSFromDeck = (desc) =>
+    /special\s+summon\s+1\s+(?:\S+\s+)*?monster\s+from\s+(?:your\s+)?deck\b/i.test(desc) ? {} : null;
+
 /**
- * Detect on-summon triggered effects.
- * Matches: "When this card is Normal or Special Summoned",
- *          "When this card is Summoned", etc.
+ * Detect "When this card is [Normal/Special] Summoned" trigger prefix.
  */
 const matchOnSummonTrigger = (desc) =>
     /when\s+this\s+card\s+is\s+(?:normal(?:ly)?\s+or\s+special(?:ly)?\s+)?summon(?:ed)?/i.test(desc);
 
+/**
+ * Detect "Once per turn: You can" prefix.
+ * Returns the sub-effect text after "You can" if found, otherwise null.
+ */
+const matchOncePerTurn = (desc) => {
+    const m = desc.match(/once\s+per\s+turn(?:[^:]*)?:\s*you\s+can\s+(.{10,})/i);
+    return m ? m[1] : null;
+};
+
 // ─── EFFECT BUILDERS ─────────────────────────────────────────────────────────
 
-const makeDrawEffect = (n) => ({
-    condition: (env) => {
-        const deck = env?.[SIDE.MINE]?.[ENVIRONMENT.DECK] || [];
-        return deck.length >= n;
-    },
+const makeDrawEffect = (n, oncePer = false) => ({
+    condition: (env) => (env?.[SIDE.MINE]?.[ENVIRONMENT.DECK] || []).length >= n,
     operation: (env) => {
         for (let i = 0; i < n; i++) {
             const deck = env[SIDE.MINE][ENVIRONMENT.DECK];
             if (!deck.length) break;
-            const card = deck.pop();
-            env[SIDE.MINE][ENVIRONMENT.HAND].push(card);
+            env[SIDE.MINE][ENVIRONMENT.HAND].push(deck.pop());
         }
         dispatchEnv(env);
-    }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-const makeGainLPEffect = (amount) => ({
+const makeGainLPEffect = (amount, oncePer = false) => ({
     condition: () => true,
     operation: (env) => {
         env[SIDE.MINE].hp = (env[SIDE.MINE].hp || 0) + amount;
         dispatchEnv(env);
-    }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-const makeDealDamageEffect = (amount) => ({
+const makeDealDamageEffect = (amount, oncePer = false) => ({
     condition: () => true,
     operation: (env) => {
         env[SIDE.OPPONENT].hp = Math.max(0, (env[SIDE.OPPONENT].hp || 0) - amount);
         dispatchEnv(env);
-    }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-const makeSearchEffect = (filter) => ({
+const makeSearchEffect = (filter, oncePer = false) => ({
     condition: (env) => {
         const deck = env?.[SIDE.MINE]?.[ENVIRONMENT.DECK] || [];
         return deck.some(c => {
-            if (!c?.card) return false;
-            if (!c.card.card_type?.startsWith('MONSTER')) return false;
+            if (!c?.card?.card_type?.startsWith('MONSTER')) return false;
             if (filter.atk?.max !== undefined && (c.card.atk ?? 0) > filter.atk.max) return false;
+            if (filter.nameIncludes && !c.card.name?.toLowerCase().includes(filter.nameIncludes.toLowerCase())) return false;
             return true;
         });
     },
@@ -153,6 +157,7 @@ const makeSearchEffect = (filter) => ({
         const valid = deck.filter(c => {
             if (!c?.card?.card_type?.startsWith('MONSTER')) return false;
             if (filter.atk?.max !== undefined && (c.card.atk ?? 0) > filter.atk.max) return false;
+            if (filter.nameIncludes && !c.card.name?.toLowerCase().includes(filter.nameIncludes.toLowerCase())) return false;
             return true;
         });
         if (!valid.length) return;
@@ -161,50 +166,51 @@ const makeSearchEffect = (filter) => ({
                 type: CARD_SELECT_TYPE.CARD_SELECT_FROM_DECK,
                 sourceList: valid,
                 numToSelect: 1,
-                label: filter.atk
-                    ? `Add 1 monster (ATK ≤ ${filter.atk.max}) from Deck to hand`
-                    : 'Add 1 monster from Deck to hand'
+                label: filter.nameIncludes
+                    ? `Add 1 "${filter.nameIncludes}" card from Deck to hand`
+                    : filter.atk
+                        ? `Add 1 monster (ATK ≤ ${filter.atk.max}) from Deck to hand`
+                        : 'Add 1 monster from Deck to hand',
             });
-            const idx = deck.findIndex(c => {
-                const id = c?.unique_count !== undefined
-                    ? `${c.card?.key}_${c.unique_count}`
-                    : c?.card?.key?.toString();
-                return id === uid;
-            });
+            const idx = deck.findIndex(c => getUid(c) === uid);
             if (idx === -1) return;
-            const [found] = deck.splice(idx, 1);
-            env[SIDE.MINE][ENVIRONMENT.HAND].push(found);
+            env[SIDE.MINE][ENVIRONMENT.HAND].push(deck.splice(idx, 1)[0]);
             dispatchEnv(env);
-        } catch (e) { /* cancelled */ }
-    }
+        } catch { /* cancelled */ }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-const makeDestroyAllMonstersEffect = (opponentOnly) => ({
-    condition: (env) => {
-        const side = opponentOnly ? SIDE.OPPONENT : SIDE.MINE;
-        const field = env?.[SIDE.OPPONENT]?.[ENVIRONMENT.MONSTER_FIELD] || [];
-        return field.some(c => c !== CARD_TYPE.PLACEHOLDER && c?.card);
-    },
+const makeDestroyAllMonstersEffect = (opponentOnly, oncePer = false) => ({
+    condition: (env) =>
+        (env?.[SIDE.OPPONENT]?.[ENVIRONMENT.MONSTER_FIELD] || []).some(c => c !== CARD_TYPE.PLACEHOLDER && c?.card),
     operation: (env) => {
         const sides = opponentOnly ? [SIDE.OPPONENT] : [SIDE.MINE, SIDE.OPPONENT];
+        const destroyed = [];
         for (const s of sides) {
             const field = env[s][ENVIRONMENT.MONSTER_FIELD];
             for (let i = 0; i < field.length; i++) {
                 if (field[i] !== CARD_TYPE.PLACEHOLDER && field[i]?.card) {
-                    env[s][ENVIRONMENT.GRAVEYARD].push(field[i]);
+                    const cardEnv = field[i];
+                    const dest = cardEnv.card?.card_type === 'MONSTER_PENDULUM'
+                        ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.GRAVEYARD;
+                    env[s][dest].push(cardEnv);
                     field[i] = CARD_TYPE.PLACEHOLDER;
+                    destroyed.push({ cardEnv, destroyedSide: s });
                 }
             }
         }
         dispatchEnv(env);
-    }
+        for (const { cardEnv, destroyedSide } of destroyed) {
+            fireTrigger(TRIGGER_TYPE.ON_DESTROY, cardEnv, env, destroyedSide);
+        }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-const makeDestroy1Effect = () => ({
-    condition: (env) => {
-        const opp = env?.[SIDE.OPPONENT]?.[ENVIRONMENT.MONSTER_FIELD] || [];
-        return opp.some(c => c !== CARD_TYPE.PLACEHOLDER && c?.card);
-    },
+const makeDestroy1Effect = (oncePer = false) => ({
+    condition: (env) =>
+        (env?.[SIDE.OPPONENT]?.[ENVIRONMENT.MONSTER_FIELD] || []).some(c => c !== CARD_TYPE.PLACEHOLDER && c?.card),
     operation: async (env) => {
         const field = env[SIDE.OPPONENT][ENVIRONMENT.MONSTER_FIELD];
         const valid = field.filter(c => c !== CARD_TYPE.PLACEHOLDER && c?.card);
@@ -214,50 +220,162 @@ const makeDestroy1Effect = () => ({
                 type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
                 label: 'Select 1 monster to destroy',
                 sourceList: valid,
-                numToSelect: 1
+                numToSelect: 1,
             });
-            const idx = field.findIndex(c => {
-                const id = c?.unique_count !== undefined
-                    ? `${c.card?.key}_${c.unique_count}`
-                    : c?.card?.key?.toString();
-                return id === uid;
-            });
+            const idx = field.findIndex(c => getUid(c) === uid);
             if (idx === -1) return;
-            env[SIDE.OPPONENT][ENVIRONMENT.GRAVEYARD].push(field[idx]);
+            const destroyed = field[idx];
+            const dest = destroyed?.card?.card_type === 'MONSTER_PENDULUM'
+                ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.GRAVEYARD;
+            env[SIDE.OPPONENT][dest].push(destroyed);
             field[idx] = CARD_TYPE.PLACEHOLDER;
             dispatchEnv(env);
-        } catch (e) { /* cancelled */ }
-    }
+            fireTrigger(TRIGGER_TYPE.ON_DESTROY, destroyed, env, SIDE.OPPONENT);
+        } catch { /* cancelled */ }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
 });
 
-// ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
+const EXTRA_DECK_TYPES = ['MONSTER_XYZ', 'MONSTER_FUSION', 'MONSTER_SYNCHRO', 'MONSTER_LINK'];
+
+const makeSSFromHandEffect = (opts = {}, oncePer = false) => ({
+    condition: (env) =>
+        (env?.[SIDE.MINE]?.[ENVIRONMENT.HAND] || []).some(c => {
+            if (!c?.card?.card_type?.startsWith('MONSTER')) return false;
+            if (EXTRA_DECK_TYPES.includes(c.card.card_type)) return false;
+            if (opts.maxLevel !== undefined && (c.card.level ?? 99) > opts.maxLevel) return false;
+            return true;
+        }),
+    operation: async (env) => {
+        const hand = env[SIDE.MINE][ENVIRONMENT.HAND];
+        const valid = hand.filter(c => {
+            if (!c?.card?.card_type?.startsWith('MONSTER')) return false;
+            if (EXTRA_DECK_TYPES.includes(c.card.card_type)) return false;
+            if (opts.maxLevel !== undefined && (c.card.level ?? 99) > opts.maxLevel) return false;
+            return true;
+        });
+        if (!valid.length) return;
+        try {
+            const { cardEnvs: [uid] } = await openSelector({
+                type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
+                label: opts.maxLevel !== undefined
+                    ? `Special Summon 1 Level ${opts.maxLevel} or lower monster from hand`
+                    : 'Special Summon 1 monster from hand',
+                sourceList: valid,
+                numToSelect: 1,
+            });
+            const idx = hand.findIndex(c => getUid(c) === uid);
+            if (idx === -1) return;
+            const [card] = hand.splice(idx, 1);
+            const field = env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
+            const priorities = [2, 3, 1, 4, 0];
+            for (const slot of priorities) {
+                if (field[slot] === CARD_TYPE.PLACEHOLDER) {
+                    card.current_pos = CARD_POS.FACE;
+                    card.summoned_this_turn = true;
+                    field[slot] = card;
+                    break;
+                }
+            }
+            dispatchEnv(env);
+        } catch { /* cancelled */ }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
+});
+
+const makeSSFromGYEffect = (oncePer = false) => ({
+    condition: (env) =>
+        (env?.[SIDE.MINE]?.[ENVIRONMENT.GRAVEYARD] || []).some(c => c?.card?.card_type?.startsWith('MONSTER')),
+    operation: async (env) => {
+        const gy = env[SIDE.MINE][ENVIRONMENT.GRAVEYARD];
+        const valid = gy.filter(c => c?.card?.card_type?.startsWith('MONSTER'));
+        if (!valid.length) return;
+        try {
+            const { cardEnvs: [uid] } = await openSelector({
+                type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
+                label: 'Special Summon 1 monster from your Graveyard',
+                sourceList: valid,
+                numToSelect: 1,
+            });
+            const idx = gy.findIndex(c => getUid(c) === uid);
+            if (idx === -1) return;
+            const [card] = gy.splice(idx, 1);
+            const field = env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
+            const priorities = [2, 3, 1, 4, 0];
+            for (const slot of priorities) {
+                if (field[slot] === CARD_TYPE.PLACEHOLDER) {
+                    card.current_pos = CARD_POS.FACE;
+                    card.summoned_this_turn = true;
+                    field[slot] = card;
+                    break;
+                }
+            }
+            dispatchEnv(env);
+        } catch { /* cancelled */ }
+    },
+    ...(oncePer ? { once_per_turn: true } : {}),
+});
 
 /**
- * Build an on_summon handler for a card whose description matches an
- * on-summon trigger pattern. Returns null if no effect matches.
+ * Fallback for unrecognized "Once per turn" effects.
+ * Shows the card's effect text in the duel log so the player can resolve it manually.
  */
+const makeLogOncePerTurnEffect = (cardName, effectText) => ({
+    condition: () => true,
+    operation: (env) => {
+        logEvent(LOG_TYPE.EFFECT, `${cardName} (Once per turn): ${effectText.slice(0, 200)}`);
+        dispatchEnv(env);
+    },
+    once_per_turn: true,
+});
+
+// ─── ON-SUMMON BUILDERS ───────────────────────────────────────────────────────
+
 const makeOnSummonEffect = (desc, cardName) => {
+    // Try SS from hand first (e.g. Goblindbergh-like)
+    const ssHand = matchSSFromHand(desc);
+    if (ssHand) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon SS from hand`, { cardName });
+            return makeSSFromHandEffect(ssHand).operation(env);
+        };
+    }
+    // Search from deck (e.g. Stratos-like)
+    const searchF = matchSearch(desc);
+    if (searchF) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon search`, { cardName });
+            return makeSearchEffect(searchF).operation(env);
+        };
+    }
+    // SS from GY
+    if (matchSSFromGY(desc)) {
+        return (env) => {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon SS from GY`, { cardName });
+            return makeSSFromGYEffect().operation(env);
+        };
+    }
     const dmg = matchDealDamage(desc);
     if (dmg) {
         return (env) => {
-            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — inflict ${dmg} damage`, { cardName });
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon — inflict ${dmg} damage`, { cardName });
             env[SIDE.OPPONENT].hp = Math.max(0, (env[SIDE.OPPONENT].hp || 0) - dmg);
             dispatchEnv(env);
         };
     }
-    const gainLP = matchGainLP(desc);
-    if (gainLP) {
+    const lp = matchGainLP(desc);
+    if (lp) {
         return (env) => {
-            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — gain ${gainLP} LP`, { cardName });
-            env[SIDE.MINE].hp = (env[SIDE.MINE].hp || 0) + gainLP;
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon — gain ${lp} LP`, { cardName });
+            env[SIDE.MINE].hp = (env[SIDE.MINE].hp || 0) + lp;
             dispatchEnv(env);
         };
     }
-    const drawN = matchDraw(desc);
-    if (drawN) {
+    const n = matchDraw(desc);
+    if (n) {
         return (env) => {
-            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon effect — draw ${drawN}`, { cardName });
-            for (let i = 0; i < drawN; i++) {
+            logEvent(LOG_TYPE.EFFECT, `${cardName}: on-summon — draw ${n}`, { cardName });
+            for (let i = 0; i < n; i++) {
                 const deck = env[SIDE.MINE][ENVIRONMENT.DECK];
                 if (!deck.length) break;
                 env[SIDE.MINE][ENVIRONMENT.HAND].push(deck.pop());
@@ -268,35 +386,53 @@ const makeOnSummonEffect = (desc, cardName) => {
     return null;
 };
 
-/**
- * Try to auto-generate an effect for a card from its description.
- * Returns an effects array (same shape as EFFECTS_REGISTRY values) or null.
- *
- * On-summon triggered effects (detected via "When this card is ... Summoned:")
- * are returned as { on_summon: fn } so Core/Summon fires them automatically.
- *
- * Activated effects priority: draw > gain LP > deal damage > destroy all >
- *   destroy opp > destroy 1 > search.
- */
+// ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
+
 export const autoGenEffect = (id, card) => {
     const desc = card?.description || card?.desc || '';
     if (!desc) return null;
     const name = card?.name || String(id);
 
-    // ── On-summon triggered effects ───────────────────────────────────────────
+    // ── 1. On-summon triggered effects ────────────────────────────────────────
     if (matchOnSummonTrigger(desc)) {
         const fn = makeOnSummonEffect(desc, name);
-        if (fn) {
-            return [{ on_summon: fn }];
-        }
-        // Matched trigger text but no recognised effect — log for debugging
+        if (fn) return [{ on_summon: fn }];
+        // Unrecognised on-summon: log for debugging, no effect entry
         logEvent(LOG_TYPE.EFFECT_FAIL,
-            `${name}: on-summon trigger detected but effect not auto-generated (needs manual entry)`,
+            `${name}: on-summon trigger detected but effect not auto-generated`,
             { cardName: name });
         return null;
     }
 
-    // ── Activated effects ─────────────────────────────────────────────────────
+    // ── 2. Once-per-turn field effects ────────────────────────────────────────
+    const subEffText = matchOncePerTurn(desc);
+    if (subEffText) {
+        const n = matchDraw(subEffText);
+        if (n) return [makeDrawEffect(n, true)];
+
+        const lp = matchGainLP(subEffText);
+        if (lp) return [makeGainLPEffect(lp, true)];
+
+        const dmg = matchDealDamage(subEffText);
+        if (dmg) return [makeDealDamageEffect(dmg, true)];
+
+        const ssHand = matchSSFromHand(subEffText);
+        if (ssHand) return [makeSSFromHandEffect(ssHand, true)];
+
+        if (matchSSFromGY(subEffText)) return [makeSSFromGYEffect(true)];
+
+        const searchF = matchSearch(subEffText);
+        if (searchF) return [makeSearchEffect(searchF, true)];
+
+        if (matchDestroyAll(subEffText)) return [makeDestroyAllMonstersEffect(false, true)];
+        if (matchDestroyOpponent(subEffText)) return [makeDestroyAllMonstersEffect(true, true)];
+        if (matchDestroy1(subEffText)) return [makeDestroy1Effect(true)];
+
+        // Fallback: show effect text in duel log so player can manually resolve
+        return [makeLogOncePerTurnEffect(name, subEffText)];
+    }
+
+    // ── 3. Plain activated effects ────────────────────────────────────────────
     const drawN = matchDraw(desc);
     if (drawN) return [makeDrawEffect(drawN)];
 
@@ -312,6 +448,10 @@ export const autoGenEffect = (id, card) => {
 
     const searchFilter = matchSearch(desc);
     if (searchFilter) return [makeSearchEffect(searchFilter)];
+
+    if (matchSSFromHand(desc)) return [makeSSFromHandEffect(matchSSFromHand(desc))];
+    if (matchSSFromGY(desc)) return [makeSSFromGYEffect()];
+    if (matchSSFromDeck(desc)) return [makeSSFromGYEffect()]; // same UI pattern, src differs visually
 
     return null;
 };

@@ -189,13 +189,26 @@ export const destroyMonsters = (opts = {}) => (env, side = SIDE.MINE) => {
                   : opts.side === 'OPPONENT' ? [side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE]
                   : [SIDE.MINE, SIDE.OPPONENT];
     const filter = buildFilter(opts.filter || {});
+    const destroyed = [];
     for (const s of targets) {
         const field = env[s][ENVIRONMENT.MONSTER_FIELD];
         for (let i = 0; i < field.length; i++) {
             if (field[i] !== CARD_TYPE.PLACEHOLDER && field[i]?.card && filter(field[i])) {
-                env[s][ENVIRONMENT.GRAVEYARD].push(field[i]);
+                const cardEnv = field[i];
+                const isPendulum = cardEnv.card?.card_type === 'MONSTER_PENDULUM';
+                const dest = isPendulum ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.GRAVEYARD;
+                env[s][dest].push(cardEnv);
                 field[i] = CARD_TYPE.PLACEHOLDER;
+                destroyed.push({ cardEnv, destroyedSide: s });
             }
+        }
+    }
+    if (destroyed.length) {
+        // Lazy require breaks the circular dep timing issue (effectFactory ↔ triggerRegistry)
+        const { fireTrigger, fireFieldWatchTriggers } = require('./triggerRegistry');
+        for (const { cardEnv, destroyedSide } of destroyed) {
+            fireTrigger(TRIGGER_TYPE.ON_DESTROY, cardEnv, env, destroyedSide);
+            fireFieldWatchTriggers(TRIGGER_TYPE.ON_ALLY_DESTROYED, cardEnv, env, destroyedSide, true);
         }
     }
 };
@@ -457,6 +470,189 @@ export const raigeki = () =>
 /** Ookazi-like: deal fixed damage */
 export const burn = (amount) =>
     onActivate(dealDamage(amount));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── NEW PRIMITIVES (Step 8 — gap-analysis additions) ─────────────────────────
+// All operations only MUTATE env. No dispatch calls inside them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Return monster(s) from a zone to hand.
+ * opts.side: 'MINE' | 'OPPONENT' | 'BOTH'
+ * opts.filter: optional buildFilter options
+ * opts.count: number of cards to bounce (default 1; use 99 for "all")
+ */
+export const bounce = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const targets = opts.side === 'MINE'     ? [side]
+                  : opts.side === 'OPPONENT' ? [side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE]
+                  : [SIDE.MINE, SIDE.OPPONENT];
+    const filter  = buildFilter(opts.filter || {});
+    const max     = opts.count ?? 1;
+    let bounced   = 0;
+
+    for (const s of targets) {
+        if (bounced >= max) break;
+        const field = env[s][ENVIRONMENT.MONSTER_FIELD];
+        for (let i = 0; i < field.length && bounced < max; i++) {
+            const c = field[i];
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+            if (!filter(c)) continue;
+            env[s][ENVIRONMENT.HAND].push(c);
+            field[i] = CARD_TYPE.PLACEHOLDER;
+            bounced++;
+        }
+    }
+};
+
+/**
+ * Banish (remove from play) monsters from a zone.
+ * Uses ENVIRONMENT.BANISHED if it exists; otherwise removes silently.
+ * opts: same as destroyMonsters
+ */
+export const banish = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const targets = opts.side === 'MINE'     ? [side]
+                  : opts.side === 'OPPONENT' ? [side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE]
+                  : [SIDE.MINE, SIDE.OPPONENT];
+    const filter  = buildFilter(opts.filter || {});
+    const src     = opts.from || ENVIRONMENT.MONSTER_FIELD;
+
+    for (const s of targets) {
+        const zone = env[s][src];
+        if (!Array.isArray(zone)) continue;
+        for (let i = 0; i < zone.length; i++) {
+            const c = src === ENVIRONMENT.MONSTER_FIELD ? zone[i] : zone[i];
+            if (!c?.card) continue;
+            if (c === CARD_TYPE.PLACEHOLDER) continue;
+            if (!filter(c)) continue;
+            // Send to BANISHED zone if it exists, otherwise to GY
+            const dest = ENVIRONMENT.BANISHED || ENVIRONMENT.GRAVEYARD;
+            if (!env[s][dest]) env[s][dest] = [];
+            env[s][dest].push(c);
+            if (src === ENVIRONMENT.MONSTER_FIELD) {
+                zone[i] = CARD_TYPE.PLACEHOLDER;
+            } else {
+                zone.splice(i, 1);
+                i--;
+            }
+        }
+    }
+};
+
+/**
+ * Banish cards from GY (e.g. Miracle Fusion material cost).
+ * opts.filter: buildFilter options
+ * opts.count: number to banish
+ */
+export const banishFromGY = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const count  = opts.count ?? 1;
+    const gy     = env[side][ENVIRONMENT.GRAVEYARD] || [];
+    const dest   = ENVIRONMENT.BANISHED;
+    if (!env[side][dest]) env[side][dest] = [];
+    let removed = 0;
+    for (let i = gy.length - 1; i >= 0 && removed < count; i--) {
+        if (!filter(gy[i])) continue;
+        env[side][dest].push(gy.splice(i, 1)[0]);
+        removed++;
+    }
+};
+
+/**
+ * Send the top N cards from a deck to the GY (mill).
+ * side: 'MINE' | 'OPPONENT' (default MINE)
+ */
+export const millCards = (n = 1, targetSide = 'MINE') => (env, side = SIDE.MINE) => {
+    const s   = targetSide === 'OPPONENT'
+        ? (side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE)
+        : side;
+    const deck = env[s][ENVIRONMENT.DECK] || [];
+    const milled = deck.splice(0, Math.min(n, deck.length));
+    env[s][ENVIRONMENT.GRAVEYARD].push(...milled);
+};
+
+/**
+ * Change a monster's battle position.
+ * opts.position: CARD_POS.FACE | CARD_POS.DEFENSE | CARD_POS.SET
+ * opts.filter:   which monster to target
+ * opts.side:     'MINE' | 'OPPONENT'
+ */
+export const changeBattlePosition = (opts = {}) => (env, side = SIDE.MINE) => {
+    const { CARD_POS: CP } = require('../Components/Card/utils/constant');
+    const s      = opts.side === 'OPPONENT'
+        ? (side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE)
+        : side;
+    const filter = buildFilter(opts.filter || {});
+    const field  = env[s][ENVIRONMENT.MONSTER_FIELD];
+    for (const c of field) {
+        if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+        if (!filter(c)) continue;
+        c.current_pos = opts.position ?? CP.DEFENSE;
+        break; // only change first match
+    }
+};
+
+/**
+ * Copy an effect from another card currently on the field.
+ * Calls the source card's first effect.operation on the current env.
+ * opts.sourceKey: card key to copy from
+ * opts.location: 'MONSTER_FIELD' | 'SPELL_FIELD'
+ */
+export const copyEffect = (opts = {}) => (env, side = SIDE.MINE) => {
+    const loc   = opts.location || ENVIRONMENT.MONSTER_FIELD;
+    const zone  = env[side][loc] || [];
+    const src   = zone.find(c =>
+        c !== CARD_TYPE.PLACEHOLDER && c?.card?.key === opts.sourceKey
+    );
+    if (!src?.card?.effects?.[0]?.operation) return;
+    return src.card.effects[0].operation(env, side);
+};
+
+/**
+ * Conditional branching: if condFn(env, side) then thenOp else elseOp.
+ * elseOp is optional.
+ */
+export const conditionalEffect = (condFn, thenOp, elseOp = null) => (env, side = SIDE.MINE) => {
+    if (condFn(env, side)) {
+        const r = thenOp(env, side);
+        return (r && typeof r.then === 'function') ? r : undefined;
+    }
+    if (elseOp) {
+        const r = elseOp(env, side);
+        return (r && typeof r.then === 'function') ? r : undefined;
+    }
+};
+
+/**
+ * Negate an effect currently being resolved (for Counter Traps).
+ * In the context of a chain, this marks the target link as negated.
+ * NOTE: actual chain-link negation is handled by Chain.negateLink().
+ * This primitive is a placeholder that logs the negation and can be
+ * connected to the chain stack by the calling code.
+ *
+ * opts.destroyCard: also destroy the negated card
+ */
+export const negate = (opts = {}) => (env, side = SIDE.MINE) => {
+    // The actual negation of a chain link requires access to the chain stack,
+    // which is managed by Core/Chain/index.js at a higher level.
+    // This operation handles the side-effect: optionally destroying the card.
+    if (opts.destroyCard && opts.targetCardEnv) {
+        const c = opts.targetCardEnv;
+        for (const s of [SIDE.MINE, SIDE.OPPONENT]) {
+            for (const zone of [ENVIRONMENT.MONSTER_FIELD, ENVIRONMENT.SPELL_FIELD]) {
+                const arr = env[s][zone];
+                if (!Array.isArray(arr)) continue;
+                for (let i = 0; i < arr.length; i++) {
+                    if (arr[i] !== CARD_TYPE.PLACEHOLDER &&
+                        arr[i]?.card?.key === c?.card?.key) {
+                        env[s][ENVIRONMENT.GRAVEYARD].push(arr[i]);
+                        arr[i] = CARD_TYPE.PLACEHOLDER;
+                        return;
+                    }
+                }
+            }
+        }
+    }
+};
 
 /** Warrior-type collector ATK boost (A. Forces pattern) */
 export const collectiveBoost = (amount, filter, cardKey) =>

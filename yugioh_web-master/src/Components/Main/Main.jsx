@@ -13,6 +13,7 @@ import Sky from 'react-sky';
 
 import ModeSelect, { GAME_MODE } from './ModeSelect/ModeSelect';
 import DeckSelect from './DeckSelect/DeckSelect';
+import DeckBuilder from './DeckBuilder/DeckBuilder';
 import { preloadDeckCards } from '../../data/cardLoader';
 import CPUPlayer from '../../AI/CPUPlayer';
 import OfflineAdapter from '../../Client/OfflineAdapter';
@@ -31,6 +32,7 @@ const SCREEN = {
     LOADING:          'LOADING',
     WAITING_PVP:      'WAITING_PVP',
     GAME:             'GAME',
+    DECK_BUILDER:     'DECK_BUILDER',
 };
 
 class Main extends React.Component {
@@ -45,6 +47,9 @@ class Main extends React.Component {
             loadingProgress: 0,
             loadingTotal: 0,
             loadingError: null,
+            duelResult: null,
+            deckBuilderReturn: SCREEN.MODE_SELECT,
+            editingDeck: null,
         };
         this.raw_environment = null;
         this.my_deck = null;
@@ -98,7 +103,7 @@ class Main extends React.Component {
     // ── Deck selection ────────────────────────────────────────────────────────
     onSelectPlayerDeck = async (deck) => {
         const cpuDeck = DECK_REGISTRY.ELEMENTAL_HERO; // CPU always plays Elemental HEROs for now
-        this.setState({ playerDeck: deck, screen: SCREEN.LOADING });
+        this.setState({ playerDeck: deck, screen: SCREEN.LOADING, duelResult: null });
         await this._loadAndStart(deck, cpuDeck);
     }
 
@@ -174,8 +179,20 @@ class Main extends React.Component {
         this.setState({ screen: SCREEN.GAME });
     }
 
+    // ── Called by Game.jsx when a player's LP reaches 0 ──────────────────────
+    onGameEnd = (result) => {
+        this.cpu1 = null;
+        this.cpu2 = null;
+        OfflineAdapter.disable();
+        const nextScreen = this.state.gameMode === GAME_MODE.PV_CPU
+            ? SCREEN.DECK_SELECT_P1
+            : SCREEN.MODE_SELECT;
+        this.setState({ screen: nextScreen, duelResult: result });
+    }
+
     // ── Called by Game.jsx when turn changes ──────────────────────────────────
     onTurnChange = (currentTurnId) => {
+        if (!this.cpu1 && !this.cpu2) return;
         const { gameMode } = this.state;
         if (!gameMode || gameMode === GAME_MODE.PVP) return;
 
@@ -188,9 +205,27 @@ class Main extends React.Component {
         }
     }
 
+    // ── Deck Builder ─────────────────────────────────────────────────────────
+    openDeckBuilder = (returnScreen = SCREEN.MODE_SELECT, editingDeck = null) => {
+        this.setState({ screen: SCREEN.DECK_BUILDER, deckBuilderReturn: returnScreen, editingDeck });
+    }
+
+    onDeckBuilderBack = () => {
+        this.setState(s => ({ screen: s.deckBuilderReturn, editingDeck: null }));
+    }
+
+    // stayInBuilder = true means save completed but user stays in the builder.
+    // Only navigate away when stayInBuilder is explicitly false.
+    onDeckBuilderSave = (_deck, stayInBuilder = true) => {
+        if (!stayInBuilder) {
+            this.setState(s => ({ screen: s.deckBuilderReturn, editingDeck: null }));
+        }
+        // Otherwise do nothing — the builder handles its own state update
+    }
+
     // ── Render ────────────────────────────────────────────────────────────────
     render() {
-        const { screen, loadingProgress, loadingTotal, loadingError, cpuDeck1 } = this.state;
+        const { screen, loadingProgress, loadingTotal, loadingError, cpuDeck1, duelResult } = this.state;
 
         if (screen === SCREEN.MODE_SELECT) {
             return (
@@ -200,18 +235,43 @@ class Main extends React.Component {
                             {loadingError}
                         </div>
                     )}
-                    <ModeSelect onSelectMode={this.onSelectMode} />
+                    {duelResult && (
+                        <div style={{
+                            textAlign: 'center', padding: '14px 20px', fontWeight: 700, fontSize: 20,
+                            background: duelResult === 'win' ? '#1a3a1a' : '#3a1a1a',
+                            color: duelResult === 'win' ? '#60e060' : '#e06060',
+                            fontFamily: 'Lato, sans-serif', letterSpacing: 1,
+                        }}>
+                            {duelResult === 'win' ? '🏆 You Win!' : '💀 You Lose.'}
+                        </div>
+                    )}
+                    <ModeSelect onSelectMode={this.onSelectMode} onBuildDeck={() => this.openDeckBuilder(SCREEN.MODE_SELECT)} />
                 </>
             );
         }
 
         if (screen === SCREEN.DECK_SELECT_P1) {
+            const resultBanner = duelResult ? (
+                <div style={{
+                    textAlign: 'center', padding: '14px 20px', fontWeight: 700, fontSize: 20,
+                    background: duelResult === 'win' ? '#1a3a1a' : '#3a1a1a',
+                    color: duelResult === 'win' ? '#60e060' : '#e06060',
+                    borderBottom: `2px solid ${duelResult === 'win' ? '#40c040' : '#c04040'}`,
+                    fontFamily: 'Lato, sans-serif', letterSpacing: 1,
+                }}>
+                    {duelResult === 'win' ? '🏆 You Win! Choose your deck for a new duel.' : '💀 You Lose. Choose your deck and try again.'}
+                </div>
+            ) : null;
             return (
-                <DeckSelect
-                    title="Choose Your Deck"
-                    onSelect={this.onSelectPlayerDeck}
-                    onBack={() => { OfflineAdapter.disable(); this.setState({ screen: SCREEN.MODE_SELECT }); }}
-                />
+                <>
+                    {resultBanner}
+                    <DeckSelect
+                        title="Choose Your Deck"
+                        onSelect={this.onSelectPlayerDeck}
+                        onBack={() => { OfflineAdapter.disable(); this.setState({ screen: SCREEN.MODE_SELECT, duelResult: null }); }}
+                        onBuildDeck={(deck) => this.openDeckBuilder(SCREEN.DECK_SELECT_P1, deck)}
+                    />
+                </>
             );
         }
 
@@ -289,8 +349,19 @@ class Main extends React.Component {
                     <Game
                         raw_environment={this.raw_environment}
                         onTurnChange={this.onTurnChange}
+                        onGameEnd={this.onGameEnd}
                     />
                 </div>
+            );
+        }
+
+        if (screen === SCREEN.DECK_BUILDER) {
+            return (
+                <DeckBuilder
+                    editingDeck={this.state.editingDeck}
+                    onBack={this.onDeckBuilderBack}
+                    onSave={this.onDeckBuilderSave}
+                />
             );
         }
 

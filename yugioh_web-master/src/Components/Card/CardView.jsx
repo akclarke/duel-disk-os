@@ -26,10 +26,8 @@ class CardView extends React.Component {
 
             if (is_monster(card_type)) {
                 return <MonsterView style={style} card={this.props.card}/>
-            } else if (is_spell(card_type)) {
-                return <SpellView style={style} card={this.props.card}/>
             } else {
-                return <p>Developing...</p>
+                return <SpellView style={style} card={this.props.card}/>
             }
         } else {
             return (

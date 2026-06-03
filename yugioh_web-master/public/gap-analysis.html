@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Duel Disk OS — Rules Gap Analysis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; font-size: 11pt; line-height: 1.6;
+         color: #1a1a1a; background: #fff; padding: 40px 60px; max-width: 960px; margin: 0 auto; }
+  h1   { font-size: 22pt; border-bottom: 3px solid #1a1a6a; padding-bottom: 8px; margin-bottom: 6px; }
+  h2   { font-size: 14pt; color: #1a1a6a; margin-top: 30px; margin-bottom: 6px; border-bottom: 1px solid #ccd; padding-bottom: 4px; }
+  h3   { font-size: 11pt; font-weight: bold; margin-top: 16px; margin-bottom: 4px; }
+  .meta { color: #555; font-size: 9pt; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 10pt; }
+  th  { background: #1a1a6a; color: white; padding: 7px 10px; text-align: left; }
+  td  { padding: 6px 10px; border-bottom: 1px solid #dde; vertical-align: top; }
+  tr:nth-child(even) td { background: #f4f6ff; }
+  .EXISTS  { color: #006600; font-weight: bold; }
+  .PARTIAL { color: #996600; font-weight: bold; }
+  .MISSING { color: #cc0000; font-weight: bold; }
+  .section { margin-top: 10px; }
+  .detail  { font-size: 9.5pt; color: #333; margin-top: 4px; }
+  .rule-ref { font-size: 8.5pt; color: #777; font-style: italic; }
+  ul { margin: 6px 0 6px 20px; }
+  li { margin-bottom: 3px; }
+  .priority-high   { background: #fff0f0 !important; }
+  .priority-medium { background: #fffbf0 !important; }
+  .priority-low    { background: #f0fff0 !important; }
+  @media print {
+    body { padding: 20px 30px; }
+    h2 { page-break-before: auto; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Duel Disk OS — Official Rules Gap Analysis</h1>
+<div class="meta">
+  Generated: 2026-05-30 &nbsp;|&nbsp; Codebase revision: master &nbsp;|&nbsp;
+  Reference: Official Yu-Gi-Oh! TCG Rulebook v10 + Tournament Policy
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>1. Executive Summary</h2>
+
+<p>This document compares the current Duel Disk OS implementation against
+the official Yu-Gi-Oh! TCG rules. Twelve rule systems were audited.
+Five are <span class="MISSING">MISSING</span> entirely,
+five are <span class="PARTIAL">PARTIAL</span>,
+and two are <span class="EXISTS">PRESENT</span> in simplified form.</p>
+
+<table>
+  <tr><th>#</th><th>Rule System</th><th>Status</th><th>Priority</th></tr>
+  <tr class="priority-high"><td>1</td><td>Chain Stack &amp; LIFO Resolution</td><td class="MISSING">MISSING</td><td>Critical</td></tr>
+  <tr class="priority-high"><td>2</td><td>Spell Speed 1 / 2 / 3 Enforcement</td><td class="MISSING">MISSING</td><td>Critical</td></tr>
+  <tr class="priority-high"><td>3</td><td>Priority Window Between Players</td><td class="PARTIAL">PARTIAL</td><td>High</td></tr>
+  <tr class="priority-high"><td>4</td><td>SEGOC (Simultaneous Effects on Chain)</td><td class="MISSING">MISSING</td><td>High</td></tr>
+  <tr class="priority-medium"><td>5</td><td>Effect Negation Mid-Chain</td><td class="MISSING">MISSING</td><td>High</td></tr>
+  <tr class="priority-medium"><td>6</td><td>Once-Per-Turn Tracking (Per Duel)</td><td class="PARTIAL">PARTIAL</td><td>Medium</td></tr>
+  <tr class="priority-medium"><td>7</td><td>Target Declaration &amp; Target Locking</td><td class="MISSING">MISSING</td><td>High</td></tr>
+  <tr class="priority-medium"><td>8</td><td>Cost vs Effect Separation</td><td class="MISSING">MISSING</td><td>Medium</td></tr>
+  <tr class="priority-medium"><td>9</td><td>Replacement Effects ("instead" clauses)</td><td class="PARTIAL">PARTIAL</td><td>Medium</td></tr>
+  <tr class="priority-medium"><td>10</td><td>Damage Step Activation Restrictions</td><td class="PARTIAL">PARTIAL</td><td>Medium</td></tr>
+  <tr class="priority-low"><td>11</td><td>Missing the Timing Rule</td><td class="MISSING">MISSING</td><td>Low</td></tr>
+  <tr class="priority-low"><td>12</td><td>Mandatory vs Optional Trigger Ordering</td><td class="PARTIAL">PARTIAL</td><td>Low</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>2. Detailed Findings</h2>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.1 Chain Stack &amp; LIFO Resolution — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: When a card or effect activates, each player may add to the chain in turn-player-goes-first order. The chain resolves Last-In-First-Out (LIFO). Each link must meet the Spell Speed requirement of the preceding link.</div>
+<div class="detail">
+<b>What exists:</b> <code>Core.Effect.activate()</code> immediately executes
+<code>effect.operation(freshEnv)</code> inside a <code>setTimeout(400ms)</code>.
+There is no chain stack data structure, no opportunity for either player to
+respond before the effect resolves, and no LIFO unwinding.
+<br/><br/>
+<b>Specific code location:</b> <code>src/Core/Effect/index.js</code> lines 55–111 —
+the entire offline execution path runs a single effect synchronously with no
+chain interlude.
+<br/><br/>
+<b>Impact:</b> Every effect that should be chainable (Quick-Play spells, trap
+activations, Quick Effects) resolves before the opponent can respond. Counter
+traps, Solemn cards, and negation effects are mechanically impossible to use
+in response.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.2 Spell Speed 1 / 2 / 3 Enforcement — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: Spell Speed 1 = Normal Spells, ignition monster effects. Speed 2 = Quick-Play Spells, Traps, Quick Effects. Speed 3 = Counter Traps only. You may only chain a card/effect of equal or greater speed to the preceding chain link. Speed 1 cannot be chained to anything.</div>
+<div class="detail">
+<b>What exists:</b> <code>CARD_TYPE</code> in <code>src/Components/Card/utils/constant.js</code>
+defines <code>SPELL.QUICK</code>, <code>TRAP.COUNTER</code>, etc., but there is no
+<code>spell_speed</code> property on any effect object, card definition, or factory wrapper.
+No enforcement mechanism exists anywhere in the codebase.
+<br/><br/>
+<b>Specific code location:</b> <code>src/data/effectFactory.js</code> — none of the
+wrappers (<code>onActivate</code>, <code>onAttackDeclared</code>, <code>oncePerTurn</code>)
+assign a spell speed. No lookup table maps card types to speeds.
+<br/><br/>
+<b>Impact:</b> Normal Spells can chain to Counter Traps. Counter Traps can be activated
+during Main Phase with nothing to chain to. Spell Speed 1 monster effects can be added to chains.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.3 Priority Window Between Players — <span class="PARTIAL">PARTIAL</span></h3>
+<div class="rule-ref">Official Rule: After a card or effect resolves, both players receive a Priority Window to activate effects. The turn player receives priority first. If neither player wishes to activate anything, the game state advances.</div>
+<div class="detail">
+<b>What exists:</b> <code>CPUPlayer._tryNormalSummon()</code> calls
+<code>offerChainToPlayer()</code> after the CPU performs a Normal Summon — this shows
+the player's face-down traps in a modal window. This covers exactly one trigger window
+(opponent Normal Summon) but nothing else.
+<br/><br/>
+<b>What is missing:</b>
+<ul>
+  <li>No priority window after CPU activates a Spell card</li>
+  <li>No priority window after the player activates an effect (CPU cannot respond)</li>
+  <li>No priority window at the start of each Phase (e.g., Standby Phase effects)</li>
+  <li>No priority window after damage calculation in the Damage Step</li>
+</ul>
+<b>Specific code location:</b> <code>src/AI/CPUPlayer.js</code> lines 24–33 —
+<code>offerChainToPlayer()</code> is only called from <code>_tryNormalSummon()</code>,
+not from any other action.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.4 SEGOC (Simultaneous Effects Go On Chain) — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: When multiple triggered effects meet their trigger condition simultaneously, they all go on the chain in the following order: (1) Mandatory turn-player effects → (2) Mandatory non-turn-player effects → (3) Optional turn-player effects → (4) Optional non-turn-player effects. Each player chooses which of their own effects to chain first.</div>
+<div class="detail">
+<b>What exists:</b> <code>fireTrigger()</code> in
+<code>src/data/triggerRegistry.js</code> runs each matching trigger in a separate
+<code>setTimeout(500ms)</code>, firing them sequentially and independently.
+<br/><br/>
+<b>Specific code location:</b> <code>src/data/triggerRegistry.js</code> lines 110–151 —
+the <code>for (const trigger of triggers)</code> loop fires each trigger in its own
+setTimeout with no grouping, ordering, or player choice.
+<br/><br/>
+<b>Impact:</b> When two cards would simultaneously trigger (e.g., Witch of the Black
+Forest destroyed at the same time as Sangan), their operations fire 500ms apart in
+definition order rather than being placed on a single chain and resolved LIFO.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.5 Effect Negation Mid-Chain — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: A negation effect (Counter Trap, Solemn Judgment, etc.) placed higher on the chain than a target effect will negate that effect when the chain resolves. The negated effect does not resolve; its declared targets are still selected but have no action applied to them.</div>
+<div class="detail">
+<b>What exists:</b> No <code>negate()</code> primitive in <code>effectFactory.js</code>.
+Cards like Legendary Six Samurai - Shi En are implemented by directly destroying the
+opponent's Spell/Trap card from the field — this is "destroy" not "negate."
+The chain stack does not exist, so there is nothing to negate.
+<br/><br/>
+<b>Specific code location:</b> <code>src/data/effectsRegistry.js</code> — Shi En
+(29981921) entry calls <code>destroyMonsters</code> rather than having any negation primitive.
+<br/><br/>
+<b>Impact:</b> Negation cards cannot function as intended. Cards like Solemn Judgment
+(cannot be registered), Effect Veiler (no timing), Forbidden Lance (no ATK modification
++ negation pattern) are structurally impossible to implement.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.6 Once-Per-Turn Tracking (Per Duel) — <span class="PARTIAL">PARTIAL</span></h3>
+<div class="rule-ref">Official Rule: "Once per turn" limits reset at the start of each turn (Draw Phase). "Once per duel" limits (Wind-Up single-use) never reset for that copy. If a card returns to hand/deck and is re-summoned, its OPT resets because it is treated as a new instance.</div>
+<div class="detail">
+<b>What exists:</b> Two separate mechanisms:
+<ul>
+  <li><code>sessionStorage</code> keyed by <code>once_per_turn_{unique_count}</code> —
+      cleared in <code>Game.jsx</code> on every turn change</li>
+  <li><code>cardEnv.wind_up_used = true</code> — permanent flag on the cardEnv object,
+      never reset</li>
+</ul>
+<b>What is wrong:</b>
+<ul>
+  <li><code>sessionStorage</code> persists across browser sessions (not scoped to a single duel)</li>
+  <li>If a card is returned to hand (e.g., via Zenmairch) and re-summoned, it gets a new
+      <code>cardEnv</code> object with a new <code>unique_count</code>, so its OPT tracking resets — this is actually correct by TCG rules but happens accidentally</li>
+  <li><code>wind_up_used</code> is set on the cardEnv directly; when the reducer
+      calls <code>applyPassiveEffects</code>, it gets a shallow copy from Redux
+      (<code>{ ...environment }</code>), which means <code>wind_up_used</code>
+      may be lost on the next state update for cards in some zones</li>
+</ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.7 Target Declaration &amp; Target Locking — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: Targeting happens at activation — the player declares targets when they put the effect on the chain. If a declared target is no longer a valid target when the effect resolves, the effect disappears without resolving (most cases). Targets are "locked" and cannot be changed after activation.</div>
+<div class="detail">
+<b>What exists:</b> All card selection (<code>openSelector</code>) happens inside
+<code>effect.operation()</code>, which runs at resolution time — not at activation
+time. There is no <code>declared_targets</code> array on chain links, and no
+validity check when the operation finally resolves.
+<br/><br/>
+<b>Specific code location:</b> Every <code>oncePerTurn</code>, <code>onActivate</code>,
+and hand-written effect that calls <code>openSelector</code> does so inside the
+<code>operation</code> function, not in a separate pre-chain <code>target</code> phase.
+<br/><br/>
+<b>Impact:</b> A player can activate an effect targeting a monster, the opponent can
+"destroy" that monster on the chain, and the player's effect will still resolve
+against the now-absent monster (or throw a silent error when the UID lookup returns
+<code>-1</code>).
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.8 Cost vs Effect Separation — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: Costs are paid at activation, before the chain is built. If the effect is negated, the cost has already been paid and is not returned. Costs include: discarding, tributing, paying LP, detaching XYZ materials, banishing from GY.</div>
+<div class="detail">
+<b>What exists:</b> Costs and effects are merged into a single
+<code>operation(env)</code> function. For example, Gagaga Cowboy detaches a material
+AND deals damage in the same async function. Predaplant Chimerafflesia selects a card
+to banish AND discards in the same function.
+<br/><br/>
+<b>Specific code location:</b> <code>src/data/effectsRegistry.js</code> —
+every hand-written operation function performs costs inside the operation body
+(e.g., material splice inside Zenmaiday's <code>field_activate</code>, LP payment
+inside Dark Magic Curtain's <code>operation</code>).
+<br/><br/>
+<b>Impact:</b> If a cost-paying effect were negated (once negation is implemented),
+the cost would be reversed since the entire operation would not have run.
+All cost-paying effects need to be refactored into a two-phase
+<code>cost(env)</code> → chain builds → <code>operation(env)</code> structure.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.9 Replacement Effects ("Instead" Clauses) — <span class="PARTIAL">PARTIAL</span></h3>
+<div class="rule-ref">Official Rule: Replacement effects use "instead" or "cannot be X, you can Y instead" language. They replace the default outcome of an event (e.g., destruction) with a different outcome. They are not activated; they apply automatically when the event would occur.</div>
+<div class="detail">
+<b>What exists:</b> The <code>can_protect_from_destroy</code> /
+<code>protect_from_destroy</code> hook on card objects, checked inside
+<code>Core.Battle.battle_to_graveyard()</code>. Wind-Up Zenmaines uses this.
+Toon Kingdom has its own manual check in the same function.
+<br/><br/>
+<b>What is missing:</b> The hook is only checked in <code>battle_to_graveyard()</code>
+(battle destruction). It is <b>not</b> checked in:
+<ul>
+  <li><code>effectFactory.destroyMonsters()</code> — card effect destruction</li>
+  <li><code>effectFactory.makeDestroy1Effect()</code></li>
+  <li>Any hand-written destroy operation in effectsRegistry</li>
+</ul>
+Replacement effects for other events (e.g., "instead of being sent to GY, banish it"
+for Macro Cosmos) are entirely absent.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.10 Damage Step Activation Restrictions — <span class="PARTIAL">PARTIAL</span></h3>
+<div class="rule-ref">Official Rule: During the Damage Step, only specific cards can be activated: cards that modify ATK/DEF, mandatory triggered effects, cards that specifically say "during the Damage Step." Quick-Play Spells, Traps, and most Quick Effects cannot be activated during the Damage Step.</div>
+<div class="detail">
+<b>What exists:</b> <code>BATTLE_STEP.DAMAGE_STEP</code> is defined in
+<code>src/Components/PlayerGround/utils/constant.js</code> and tracked in
+<code>battleMetaReducer</code>. The trap activation window in
+<code>Field.jsx</code> only opens at <code>START_STEP</code>, not
+<code>DAMAGE_STEP</code> — so most traps are effectively blocked from the
+Damage Step already.
+<br/><br/>
+<b>What is missing:</b> No general enforcement. A player could click on a face-down
+Quick-Play Spell during the Damage Step and activate it without restriction (Side.jsx
+only checks <code>is_main_phase</code>, not whether we are in a battle step).
+ATK/DEF modifying effects should be <em>allowed</em> in the Damage Step but are
+not tagged as such.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.11 Missing the Timing Rule — <span class="MISSING">MISSING</span></h3>
+<div class="rule-ref">Official Rule: An optional trigger effect that uses "When [trigger]: you can [effect]" can only be activated if the trigger condition was the <em>last thing to happen</em>. If another event occurred after the trigger (e.g., another effect resolved), the optional trigger "misses the timing" and cannot be activated.</div>
+<div class="detail">
+<b>What exists:</b> All triggers in <code>triggerRegistry.js</code> fire via
+<code>fireTrigger()</code> immediately when their condition is met, regardless of
+what happened afterward. There is no tracking of "last event" and no check
+against it.
+<br/><br/>
+<b>Impact:</b> Optional trigger effects (e.g., "When this card is destroyed: you can
+add 1 card to your hand") will always activate even when they should miss the timing.
+In practice, this makes effects slightly more powerful than the TCG rules allow,
+but rarely causes game-breaking errors for casual play.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h3>2.12 Mandatory vs Optional Trigger Ordering — <span class="PARTIAL">PARTIAL</span></h3>
+<div class="rule-ref">Official Rule (SEGOC follow-up): When simultaneous triggers fire, mandatory effects (those that say "X happens: do Y" without "you can") must be chained before optional ones ("X happens: you can do Y"). Mandatory triggers cannot be declined.</div>
+<div class="detail">
+<b>What exists:</b> All triggers are treated as optional. The
+<code>fireTrigger</code> loop fires each matching trigger with a
+<code>setTimeout(500ms)</code> delay, with no distinction between
+mandatory and optional effects.
+<br/><br/>
+<b>What is missing:</b> No <code>mandatory: true</code> flag on trigger entries.
+No ordering enforcement when multiple triggers fire simultaneously.
+<br/><br/>
+<b>Impact:</b> Mandatory triggers (e.g., Witch of the Black Forest — "is sent to
+the GY: add 1 monster to your hand") are treated as optional and fire asynchronously
+500ms after the event. In practice, since no UI prompt exists, they always activate,
+which accidentally gives the correct result even without formal enforcement.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>3. Implementation Roadmap</h2>
+
+<table>
+  <tr><th>Priority</th><th>System</th><th>New Files</th><th>Modified Files</th></tr>
+  <tr><td>1 — Critical</td><td>Chain Stack + Spell Speed</td>
+      <td><code>src/Core/Chain/index.js</code></td>
+      <td><code>Core/Effect/index.js</code>, <code>triggerRegistry.js</code>, <code>CPUPlayer.js</code></td></tr>
+  <tr><td>2 — Critical</td><td>OncePer module (replaces sessionStorage)</td>
+      <td><code>src/Core/OncePer/index.js</code></td>
+      <td><code>Side.jsx</code>, <code>effectFactory.js</code>, <code>gameMetaReducer.js</code></td></tr>
+  <tr><td>3 — High</td><td>Targeting system (declaration at activation)</td>
+      <td><code>src/Core/Targeting/index.js</code></td>
+      <td><code>effectFactory.js</code>, <code>Core/Effect/index.js</code></td></tr>
+  <tr><td>4 — High</td><td>New effectFactory primitives (negate, bounce, banish…)</td>
+      <td>—</td>
+      <td><code>src/data/effectFactory.js</code></td></tr>
+  <tr><td>5 — Medium</td><td>Cost/effect separation</td>
+      <td>—</td>
+      <td><code>effectFactory.js</code>, all hand-written effectsRegistry entries</td></tr>
+  <tr><td>6 — Medium</td><td>Replacement effect hook (all destroy paths)</td>
+      <td>—</td>
+      <td><code>effectFactory.js</code>, <code>Core/Battle/index.js</code>, <code>Core/Misc/index.js</code></td></tr>
+  <tr><td>7 — Low</td><td>Missing the Timing + SEGOC ordering</td>
+      <td>—</td>
+      <td><code>triggerRegistry.js</code></td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>4. Validation &amp; Generation Tooling</h2>
+
+<p>Two scripts will be provided alongside this analysis:</p>
+<ul>
+  <li><b>scripts/validateEffects.js</b> — cross-references every registered passcode
+      against the YGOPro Lua script repository and outputs a JSON report graded
+      PASS / FAIL / WARN / MISSING.</li>
+  <li><b>scripts/generateEffects.js</b> — accepts passcodes as CLI arguments, fetches
+      card data + Lua reference, and calls Claude claude-sonnet-4-6 to generate a
+      draft effectsRegistry or triggerRegistry entry for review before appending.</li>
+</ul>
+
+<p style="margin-top:30px; font-size:9pt; color:#777; border-top:1px solid #ccc; padding-top:8px;">
+  Duel Disk OS Gap Analysis &nbsp;|&nbsp; Ashton Clarke &nbsp;|&nbsp; 2026-05-30
+</p>
+
+</body>
+</html>

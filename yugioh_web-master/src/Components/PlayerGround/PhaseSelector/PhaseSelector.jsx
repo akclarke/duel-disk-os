@@ -1,7 +1,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 import { PHASE, PHASE_START } from '../utils/constant'
-import { ENVIRONMENT, CARD_TYPE, SIDE } from '../../Card/utils/constant';
+import { ENVIRONMENT, CARD_TYPE, SIDE, CARD_POS } from '../../Card/utils/constant';
 import { change_phase } from '../../../Store/actions/gameMetaActions'
 import { emit_change_phase } from '../../../Client/Sender'
 import { show_tool } from '../../../Store/actions/toolActions';
@@ -9,11 +9,19 @@ import { TOOL_TYPE } from '../../../Store/actions/actionTypes';
 import { CARD_SELECT_TYPE } from '../utils/constant';
 import { get_unique_id_from_ennvironment } from '../utils/utils';
 import Core from '../../../Core';
+import { choosePosition } from '../../../data/positionChooser';
 import './PhaseSelector.css';
 
 class PhaseSelector extends React.Component {
     constructor(props) {
         super(props);
+        this.state = { pendulumSummonUsed: false };
+    }
+
+    componentDidUpdate(prevProps) {
+        if (prevProps.game_meta?.current_turn !== this.props.game_meta?.current_turn) {
+            this.setState({ pendulumSummonUsed: false });
+        }
     }
 
     handlePhaseChange = (next_phase, phase_button_class) => {
@@ -56,8 +64,9 @@ class PhaseSelector extends React.Component {
         const field = environment[SIDE.MINE]?.[ENVIRONMENT.MONSTER_FIELD] || [];
         return extra.some(c => {
             if (c?.card?.card_type !== CARD_TYPE.MONSTER.XYZ) return false;
-            const level = c.card.level || 0;
-            const sameLevel = field.filter(m => m?.card && (m.card.level || 0) === level);
+            const rank = c.card.rank || c.card.level || 0;
+            // current_level allows Gagaga Magician (and similar) to change their level
+            const sameLevel = field.filter(m => m?.card && (m.current_level ?? m.card.level ?? 0) === rank);
             return sameLevel.length >= 2;
         });
     }
@@ -96,9 +105,10 @@ class PhaseSelector extends React.Component {
 
     hasPendulumScales = () => {
         const { environment } = this.props;
-        if (!environment) return false;
+        if (!environment || this.state.pendulumSummonUsed) return false;
         const zones = environment[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE] || [null, null];
-        return zones[0]?.card && zones[1]?.card;
+        return zones[0]?.card && zones[0]?.current_pos === CARD_POS.FACE &&
+               zones[1]?.card && zones[1]?.current_pos === CARD_POS.FACE;
     }
 
     hasLinkTargets = () => {
@@ -112,12 +122,16 @@ class PhaseSelector extends React.Component {
     }
 
     handlePendulumSummon = async () => {
+        if (this.state.pendulumSummonUsed) {
+            alert('You have already Pendulum Summoned this turn.');
+            return;
+        }
         const { environment } = this.props;
         const zones = environment[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE] || [null, null];
-        const leftScale  = zones[0]?.card?.scale ?? null;
-        const rightScale = zones[1]?.card?.scale ?? null;
+        const leftScale  = zones[0]?.current_pos === CARD_POS.FACE ? (zones[0]?.card?.scale ?? null) : null;
+        const rightScale = zones[1]?.current_pos === CARD_POS.FACE ? (zones[1]?.card?.scale ?? null) : null;
         if (leftScale === null || rightScale === null) {
-            alert('You need two Pendulum Scales set first. Click a Pendulum Monster in hand and choose "Scale".');
+            alert('You need two face-up Pendulum Scales first. Click a Pendulum Monster in hand and choose "Scale".');
             return;
         }
         try {
@@ -125,17 +139,24 @@ class PhaseSelector extends React.Component {
                 type: CARD_SELECT_TYPE.CARD_SELECT_PENDULUM_TARGETS
             });
             if (!targetIds.length) return;
-            const allSources = [
-                ...(environment[SIDE.MINE][ENVIRONMENT.EXTRA_DECK] || []),
-                ...(environment[SIDE.MINE][ENVIRONMENT.HAND] || []),
-            ];
+            this.setState({ pendulumSummonUsed: true });
+            const freshEnv = this.props.environment;
+            const extraDeck = freshEnv[SIDE.MINE][ENVIRONMENT.EXTRA_DECK] || [];
+            const hand      = freshEnv[SIDE.MINE][ENVIRONMENT.HAND] || [];
+            const allSources = [...extraDeck, ...hand];
             for (const uid of targetIds) {
                 const cardEnv = allSources.find(c => c && get_unique_id_from_ennvironment(c) === uid);
                 if (!cardEnv) continue;
-                const src = environment[SIDE.MINE][ENVIRONMENT.EXTRA_DECK].includes(cardEnv)
-                    ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.HAND;
-                const info = { side: SIDE.MINE, card: cardEnv, src_location: src };
-                Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
+                const fromExtra = extraDeck.some(c => c && get_unique_id_from_ennvironment(c) === uid);
+                const src = fromExtra ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.HAND;
+                const pos = await choosePosition(cardEnv.card?.name || 'Monster');
+                const info = {
+                    side: SIDE.MINE,
+                    card: cardEnv,
+                    src_location: src,
+                    position: pos,
+                };
+                Core.Summon.summon(info, 'SPECIAL_SUMMON', freshEnv);
             }
         } catch (e) { /* cancelled */ }
     }
@@ -174,17 +195,88 @@ class PhaseSelector extends React.Component {
             if (!target) return;
 
             const numMats = target.card.xyz_material_count || 2;
+            // Use rank (or level) of the XYZ monster as the required level for materials
+            const requiredRank = target.card.rank || target.card.level || 0;
             const { cardEnvs: materialIds } = await this.openSelector({
                 type: CARD_SELECT_TYPE.CARD_SELECT_XYZ_MATERIALS,
-                requiredLevel: target.card.level || 0,
+                requiredLevel: requiredRank,
                 numToSelect: numMats
             });
 
             if (materialIds.length !== numMats) return;
 
-            // Attach as overlay units (simplified → GY for now)
-            Core.Summon.tribute(materialIds, SIDE.MINE, ENVIRONMENT.MONSTER_FIELD, environment);
-            const info = { side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK };
+            // Remove materials from field and attach as overlay units (NOT sent to GY)
+            const field = environment[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
+            const attachedMaterials = [];
+            for (const uid of materialIds) {
+                const idx = field.findIndex(c => c?.card && get_unique_id_from_ennvironment(c) === uid);
+                if (idx !== -1) {
+                    attachedMaterials.push(field[idx]);
+                    field[idx] = CARD_TYPE.PLACEHOLDER;
+                }
+            }
+            target.xyz_materials = attachedMaterials;
+
+            const pos = await choosePosition(target.card?.name || 'Monster');
+            const info = { side: SIDE.MINE, card: target, src_location: ENVIRONMENT.EXTRA_DECK, position: pos };
+            Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
+        } catch (e) { /* cancelled */ }
+    }
+
+    // ── Secret Six Samurai - Rihan Contact Fusion ──────────────────────────────
+    // Requires 3 Six Samurai with 3 different Attributes on field → send to GY → SS Rihan
+    hasRihanTargets = () => {
+        const { environment } = this.props;
+        if (!environment) return false;
+        const extra = environment[SIDE.MINE]?.[ENVIRONMENT.EXTRA_DECK] || [];
+        const hasRihan = extra.some(c => c?.card?.key === 33964637);
+        if (!hasRihan) return false;
+        const field = (environment[SIDE.MINE]?.[ENVIRONMENT.MONSTER_FIELD] || []).filter(c =>
+            c !== CARD_TYPE.PLACEHOLDER && c?.card?.name?.toLowerCase().includes('samurai')
+        );
+        if (field.length < 3) return false;
+        // Need 3 with 3 different attributes
+        const attrs = new Set(field.map(c => c.card.attribute?.toUpperCase()).filter(Boolean));
+        return attrs.size >= 3;
+    }
+
+    handleRihanSummon = async () => {
+        const { environment } = this.props;
+        const field = (environment[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD] || []).filter(c =>
+            c !== CARD_TYPE.PLACEHOLDER && c?.card?.name?.toLowerCase().includes('samurai')
+        );
+        try {
+            // Player selects 3 Six Samurai with different attributes as materials
+            const { cardEnvs: matIds } = await this.openSelector({
+                type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
+                label: 'Rihan Contact Fusion — select 3 Six Samurai with 3 different Attributes',
+                sourceList: field,
+                numToSelect: 3,
+            });
+            if (matIds.length < 3) return;
+
+            // Validate 3 different attributes
+            const selected = matIds.map(uid => field.find(c => get_unique_id_from_ennvironment(c) === uid)).filter(Boolean);
+            const attrs = new Set(selected.map(c => c.card.attribute?.toUpperCase()).filter(Boolean));
+            if (attrs.size < 3) {
+                alert('Rihan requires 3 Six Samurai with 3 different Attributes!');
+                return;
+            }
+
+            // Send 3 materials to GY
+            const mf = environment[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
+            for (const uid of matIds) {
+                const idx = mf.findIndex(c => c?.card && get_unique_id_from_ennvironment(c) === uid);
+                if (idx !== -1) {
+                    environment[SIDE.MINE][ENVIRONMENT.GRAVEYARD].push(mf[idx]);
+                    mf[idx] = CARD_TYPE.PLACEHOLDER;
+                }
+            }
+
+            // SS Rihan from Extra Deck
+            const rihan = environment[SIDE.MINE][ENVIRONMENT.EXTRA_DECK].find(c => c?.card?.key === 33964637);
+            if (!rihan) return;
+            const info = { side: SIDE.MINE, card: rihan, src_location: ENVIRONMENT.EXTRA_DECK, position: CARD_POS.FACE };
             Core.Summon.summon(info, 'SPECIAL_SUMMON', environment);
         } catch (e) { /* cancelled */ }
     }
@@ -235,6 +327,11 @@ class PhaseSelector extends React.Component {
                 onClick={this.handleLinkSummon} title="Link Summon">🔗 Link</div>
             : null;
 
+        const rihanBtn = inMainPhase && this.hasRihanTargets()
+            ? <div className="phase_button phase_button_enabled phase_button_special"
+                onClick={this.handleRihanSummon} title="Rihan Contact Fusion">⛩️ Rihan</div>
+            : null;
+
         return (
             <div className="turn_selector_container">
                 {phaseArray}
@@ -242,6 +339,7 @@ class PhaseSelector extends React.Component {
                 {xyzBtn}
                 {pendulumBtn}
                 {linkBtn}
+                {rihanBtn}
             </div>
         );
     }

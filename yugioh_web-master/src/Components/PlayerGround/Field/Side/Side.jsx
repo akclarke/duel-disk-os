@@ -14,6 +14,7 @@ import { returnAttackStatus, constructFieldFromEnv, get_styled_index_from_enviro
 import { BATTLE_SELECT, ANIMATION_TYPE } from '../utils/constant'
 import { is_spell, is_trap } from "../../../Card/utils/utils";
 import Core from '../../../../Core';
+import OncePer from '../../../../Core/OncePer';
 import ZoneViewer from '../../ZoneViewer/ZoneViewer';
 
 /**
@@ -69,6 +70,16 @@ class Side extends React.Component {
 
     
     onCardClickHandler = (info, cardIndex) => {
+        // Special zones: GY and Extra Deck open the zone viewer on any click
+        if (cardIndex === 6) {
+            this.openZoneViewer(this.props.side === SIDE.MINE ? 'gy_mine' : 'gy_opp');
+            return;
+        }
+        if (cardIndex === 7) {
+            this.openZoneViewer(this.props.side === SIDE.MINE ? 'extra_mine' : 'extra_opp');
+            return;
+        }
+
         // clicking the card on the field
         if (!info.cardEnv.card) {
             return
@@ -101,30 +112,10 @@ class Side extends React.Component {
                     return;
                 }
             }
-            // Face-up monster with field-activated effect (e.g. Red-Eyes Toon Dragon)
+            // Face-up monster click — just open the options panel (Activate button handles activation)
             if (card.card_type?.startsWith('MONSTER') &&
-                info.cardEnv.current_pos === CARD_POS.FACE) {
-                const effects = card.effects || [];
-                for (const eff of effects) {
-                    if (eff.once_per_turn && eff.condition && eff.condition(environment)) {
-                        // Check if already used this turn
-                        const usedKey = `once_per_turn_${info.cardEnv.unique_count}`;
-                        if (sessionStorage.getItem(usedKey)) break; // already used
-                        const result = eff.operation(environment);
-                        const finish = () => {
-                            sessionStorage.setItem(usedKey, '1');
-                            const { update_environment } = require('../../../../Store/actions/environmentActions');
-                            const storeModule = require('../../../../Store/store');
-                            storeModule.default.dispatch(update_environment(environment));
-                        };
-                        if (result && typeof result.then === 'function') {
-                            result.then(finish).catch(() => {});
-                        } else {
-                            finish();
-                        }
-                        return;
-                    }
-                }
+                (info.cardEnv.current_pos === CARD_POS.FACE || info.cardEnv.current_pos === CARD_POS.DEFENSE)) {
+                // fall through to setState({cardClicked}) below
             }
         }
 
@@ -141,6 +132,91 @@ class Side extends React.Component {
         this.setState({cardClicked: cardIndex})
     }
     
+
+    hasActivatableEffect = (cardEnv) => {
+        const { environment } = this.props;
+        const effects = cardEnv?.card?.effects || [];
+        const usedKey = `once_per_turn_${cardEnv.unique_count}`;
+        // Monsters and face-up spells/traps with once_per_turn effects
+        const hasOncePerTurn = effects.some((eff, idx) => {
+            if (!eff.once_per_turn) return false;
+            if (!OncePer.canActivate(cardEnv, idx, !!eff.wind_up)) return false;
+            return !eff.condition || eff.condition(environment);
+        });
+        if (hasOncePerTurn) return true;
+        // Continuous spells/traps with a field_activate function (e.g. Six Samurai United)
+        const hasFieldActivate = effects.some(eff => typeof eff.field_activate === 'function');
+        if (hasFieldActivate) {
+            const counters = cardEnv.bushido_counters || 0;
+            return counters > 0;
+        }
+        return false;
+    };
+
+    activateFieldEffect = async (cardEnv) => {
+        const { environment } = this.props;
+        const effects = cardEnv.card?.effects || [];
+        // Collect every activatable effect entry for this card
+        const available = [];
+        effects.forEach((eff, idx) => {
+            if (typeof eff.field_activate === 'function') {
+                if (cardEnv.bushido_counters > 0 || !eff.condition || eff.condition(environment, cardEnv)) {
+                    available.push({ eff, idx, type: 'field_activate' });
+                }
+            } else if (eff.once_per_turn) {
+                if (!OncePer.canActivate(cardEnv, idx, !!eff.wind_up)) return;
+                if (eff.condition && !eff.condition(environment)) return;
+                available.push({ eff, idx, type: 'once_per_turn' });
+            }
+        });
+
+        if (!available.length) { this.setState({ cardClicked: -1 }); return; }
+
+        // If multiple effects available, ask the player which to use
+        let chosen = available[0];
+        if (available.length > 1) {
+            const { chooseEffect } = require('../../../../data/effectChooser');
+            const choices = available.map((a, i) => ({
+                id: String(i),
+                label: a.eff.effect_label || (a.type === 'field_activate' ? 'Send to GY effect' : 'Once per turn effect'),
+                description: a.eff.effect_desc || '',
+            }));
+            const chosenId = await chooseEffect(choices);
+            if (chosenId === null) { this.setState({ cardClicked: -1 }); return; }
+            chosen = available[parseInt(chosenId, 10)];
+        }
+
+        const { eff, type } = chosen;
+        this.setState({ cardClicked: -1 });
+
+        if (type === 'field_activate') {
+            const result = eff.field_activate(environment, cardEnv);
+            if (result && typeof result.then === 'function') result.catch(() => {});
+            return;
+        }
+
+        // once_per_turn path
+        const result = eff.operation(environment, cardEnv);
+        const finish = () => {
+            OncePer.markUsed(cardEnv, chosen.idx, !!eff.wind_up);
+            const { update_environment } = require('../../../../Store/actions/environmentActions');
+            const storeModule = require('../../../../Store/store');
+            storeModule.default.dispatch(update_environment(environment));
+
+            if (eff.wind_up) {
+                setTimeout(() => {
+                    const { fireFieldWatchTriggers, TRIGGER_TYPE } = require('../../../../data/triggerRegistry');
+                    const freshEnv = storeModule.default.getState().environmentReducer.environment;
+                    fireFieldWatchTriggers(TRIGGER_TYPE.ON_WINDUP_EFFECT, cardEnv, freshEnv, 'MINE', true);
+                }, 400);
+            }
+        };
+        if (result && typeof result.then === 'function') {
+            result.then(finish).catch(() => {});
+        } else {
+            finish();
+        }
+    };
 
     changePositionHandler = (cardEnv, newPos) => {
         const { environment } = this.props;
@@ -267,19 +343,52 @@ class Side extends React.Component {
         return field_cards.map((cardEnv, index) => {
             const cardView = () => {
                 if (index == 0) {
-                    // Pendulum Zone indicator (top-left corner slot)
+                    // Pendulum Zone — show both placed cards as stacked thumbnails, click to open viewer
                     const pendZones = environment?.[side]?.[ENVIRONMENT.PENDULUM_ZONE] || [null, null];
-                    const lScale = pendZones[0]?.card?.scale;
-                    const rScale = pendZones[1]?.card?.scale;
-                    return (
-                        <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:2,boxSizing:'border-box'}}>
-                            <div style={{fontSize:6,color:'#888',fontWeight:'bold',letterSpacing:1}}>SCALES</div>
-                            <div style={{fontSize:11,fontWeight:'bold',color: lScale!=null ? '#c080ff' : '#333', lineHeight:1.2}}>
-                                {lScale != null ? lScale : '—'}
+                    const leftCard  = pendZones[0];
+                    const rightCard = pendZones[1];
+                    const hasAny = leftCard || rightCard;
+                    const pendZoneKey = side === SIDE.MINE ? 'pendulum_mine' : 'pendulum_opp';
+
+                    const miniCard = (cardEnvSlot, label) => {
+                        if (!cardEnvSlot?.card) {
+                            return (
+                                <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',
+                                    background:'rgba(60,0,80,0.15)',borderRadius:2,border:'1px dashed #3a1a5a',
+                                    fontSize:6,color:'#3a1a5a',letterSpacing:0.5}}>
+                                    {label}
+                                </div>
+                            );
+                        }
+                        const c = cardEnvSlot.card;
+                        const img = c.card_pic || c.image_url || 'https://ms.yugipedia.com//f/fd/Back-Anime-ZX-2.png';
+                        return (
+                            <div style={{flex:1,position:'relative',overflow:'hidden',borderRadius:2}}>
+                                <img src={img} alt={c.name}
+                                    style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+                                    onError={e => { e.target.src='https://ms.yugipedia.com//f/fd/Back-Anime-ZX-2.png'; }} />
+                                {c.scale != null && (
+                                    <div style={{position:'absolute',bottom:1,right:1,
+                                        background:'rgba(0,0,0,0.75)',color:'#c080ff',
+                                        fontSize:7,fontWeight:'bold',padding:'0 2px',borderRadius:2}}>
+                                        {c.scale}
+                                    </div>
+                                )}
                             </div>
-                            <div style={{fontSize:8,color:'#555',lineHeight:1}}>│</div>
-                            <div style={{fontSize:11,fontWeight:'bold',color: rScale!=null ? '#c080ff' : '#333', lineHeight:1.2}}>
-                                {rScale != null ? rScale : '—'}
+                        );
+                    };
+
+                    return (
+                        <div onClick={() => hasAny && this.openZoneViewer(pendZoneKey)}
+                            style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',
+                                gap:1,padding:2,boxSizing:'border-box',
+                                cursor: hasAny ? 'pointer' : 'default'}}>
+                            <div style={{fontSize:5,color:'#555',fontWeight:'bold',letterSpacing:0.5,lineHeight:1,textAlign:'center'}}>
+                                PEND
+                            </div>
+                            <div style={{flex:1,display:'flex',gap:1,minHeight:0}}>
+                                {miniCard(leftCard, 'L')}
+                                {miniCard(rightCard, 'R')}
                             </div>
                         </div>
                     );
@@ -301,14 +410,28 @@ class Side extends React.Component {
                 }
 
                 if (index == 7) {
-                    // Extra deck — click to open viewer
-                    const extraZone = side === SIDE.MINE ? 'extra_mine' : 'extra_opp';
-                    const extraCount = environment[side][ENVIRONMENT.EXTRA_DECK]?.length || 0;
+                    // Extra deck — show top card + count, click to open viewer
+                    const extraArr = Array.isArray(cardEnv) ? cardEnv : (environment[side][ENVIRONMENT.EXTRA_DECK] || []);
+                    const extraCount = extraArr.length;
+                    if (extraCount === 0) {
+                        return (
+                            <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'#2a2a5a',fontSize:10,userSelect:'none'}}>
+                                EXTRA<br/>0
+                            </div>
+                        );
+                    }
+                    const topCard = extraArr[extraCount - 1];
+                    const img = topCard?.card?.card_pic || topCard?.card?.image_url || 'https://ms.yugipedia.com//f/fd/Back-Anime-ZX-2.png';
                     return (
-                        <div onClick={() => this.openZoneViewer(extraZone)} style={{cursor:'pointer',width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}>
-                            <div style={{fontSize:7,color:'#888',fontWeight:'bold',letterSpacing:1}}>EXTRA</div>
-                            <div style={{fontSize:16,fontWeight:'bold',color:'#a0f0ff',lineHeight:1}}>{extraCount}</div>
-                            <div style={{fontSize:7,color:'#555'}}>[click]</div>
+                        <div style={{position:'relative', width:'100%', height:'100%'}}>
+                            <img src={img} alt="extra" style={{width:'100%',height:'100%',objectFit:'cover',display:'block',opacity:0.85}}
+                                onError={e => { e.target.src='https://ms.yugipedia.com//f/fd/Back-Anime-ZX-2.png'; }} />
+                            <div style={{position:'absolute',bottom:2,right:3,background:'rgba(0,0,0,0.7)',color:'#a0f0ff',fontSize:9,fontWeight:'bold',padding:'1px 4px',borderRadius:3}}>
+                                {extraCount}
+                            </div>
+                            <div style={{position:'absolute',top:1,left:2,background:'rgba(0,0,0,0.6)',color:'#88f',fontSize:7,fontWeight:'bold',padding:'1px 3px',borderRadius:2,letterSpacing:0.5}}>
+                                EX
+                            </div>
                         </div>
                     );
                 }
@@ -372,6 +495,8 @@ class Side extends React.Component {
                 && cardEnv.current_pos === CARD_POS.SET && !cardEnv.summoned_this_turn;
             const can_to_def = side === SIDE.MINE && is_my_turn && is_main_phase && is_monster_card
                 && cardEnv.current_pos === CARD_POS.FACE && !cardEnv.summoned_this_turn && !cardEnv.pos_changed_this_turn;
+            const can_activate_effect = side === SIDE.MINE && is_my_turn && is_main_phase
+                && this.hasActivatableEffect(cardEnv);
 
             return (
                 <div
@@ -390,6 +515,12 @@ class Side extends React.Component {
                                 onClick={()=>this.monsterAttackOnClick(MONSTER_ATTACK_TYPE.OTHERS_ATTACK, info)}>
                                     Attack
                             </div>
+                            {can_activate_effect && (
+                                <div className="show_summon show_summon_effect"
+                                    onClick={(e) => { e.stopPropagation(); this.activateFieldEffect(cardEnv); }}>
+                                    ✦ Activate
+                                </div>
+                            )}
                             {can_flip && (
                                 <div className="show_summon"
                                     onClick={(e) => { e.stopPropagation(); this.changePositionHandler(cardEnv, CARD_POS.FACE); }}>
@@ -405,6 +536,18 @@ class Side extends React.Component {
                         </div>
                         
                         <div className={"card_mask" + (cardEnv.current_pos != CARD_POS.SET || (index >= 8 && index <= 12) ? "" : " side_card_set")}/>
+                        {/* Predator Counter badge — visible on any face-up monster with a counter */}
+                        {(cardEnv.predator_counter || 0) > 0 && cardEnv.card && cardEnv.current_pos !== CARD_POS.SET && (
+                            <div className="pred_counter_badge" title={`${cardEnv.predator_counter} Predator Counter(s)`}>
+                                🔴{cardEnv.predator_counter}
+                            </div>
+                        )}
+                        {/* XYZ material count badge */}
+                        {(cardEnv.xyz_materials?.length || 0) > 0 && (
+                            <div className="xyz_mat_badge">
+                                ◆{cardEnv.xyz_materials.length}
+                            </div>
+                        )}
                         <TransitionGroup>
     {cardView() ? (
         <CSSTransition

@@ -48,10 +48,15 @@ const buildMonsterCard = (id, apiCard, cardType) => {
         isTuner: apiCard.type?.toLowerCase().includes('tuner') ||
                  apiCard.desc?.toLowerCase().includes('tuner') || false,
         effects,
-        passive_effect: effects[0]?.passive_effect ?? null,
-        on_summon: effects[0]?.on_summon ?? null,
-        can_normal_summon: buildCanNormalSummon(level, cardType),
-        can_special_summon: () => false,
+        // Scan all effects in the array — a card may define on_summon in one entry
+        // and passive_effect/can_hand_ss in another.
+        passive_effect:           effects.reduce((f, e) => f ?? e.passive_effect,           null) ?? null,
+        on_summon:                effects.reduce((f, e) => f ?? e.on_summon,                null) ?? null,
+        can_normal_summon:         buildCanNormalSummon(level, cardType),
+        can_special_summon:        effects.reduce((f, e) => f ?? e.can_hand_ss,              null) || (() => false),
+        can_protect_from_destroy:  effects.reduce((f, e) => f ?? e.can_protect_from_destroy, null) ?? null,
+        protect_from_destroy:      effects.reduce((f, e) => f ?? e.protect_from_destroy,     null) ?? null,
+        battle_damage_multiplier:  effects.reduce((f, e) => f ?? e.battle_damage_multiplier, null) ?? 1,
     };
 
     if (cardType === CARD_TYPE.MONSTER.FUSION) {

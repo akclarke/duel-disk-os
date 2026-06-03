@@ -5,10 +5,11 @@ import { initialize_environment, draw_card, update_environment } from '../../Sto
 import { change_phase } from '../../Store/actions/gameMetaActions'
 import { load_card_to_environment } from '../Card/utils/utils'
 import { create_card_from_api } from '../../data/cardLoader'
-import { CARD_TYPE, SIDE, ENVIRONMENT } from '../Card/utils/constant'
+import { CARD_TYPE, SIDE, ENVIRONMENT, CARD_POS } from '../Card/utils/constant'
 import { PHASE, PHASE_START } from '../PlayerGround/utils/constant'
 import { emit_change_phase } from '../../Client/Sender'
 import { logEvent, LOG_TYPE, setLogTurn } from '../../data/duelLog';
+import OncePer from '../../Core/OncePer';
 import Field from './Field/Field.jsx';
 import Hand from './Hand/Hand.jsx';
 import DuelLog from './DuelLog/DuelLog';
@@ -17,6 +18,9 @@ import PhaseSelector from './PhaseSelector/PhaseSelector'
 import HealthBar from './HealthBar/HealthBar'
 import CardSelector from './CardSelector/CardSelector'
 import ChainWindow from './ChainWindow/ChainWindow'
+import PositionChooser from './PositionChooser/PositionChooser'
+import LevelChooser from './LevelChooser/LevelChooser'
+import EffectChooser from './EffectChooser/EffectChooser'
 import PhaseAnimator from './PhaseSelector/PhaseAnimator'
 import './Game.css';
 import { TOOL_TYPE } from '../../Store/actions/actionTypes';
@@ -31,6 +35,7 @@ class Game extends React.Component {
             y_pos: -100,
         }
         this.tabFlashInterval = null;
+        this._gameOver = false;
     }
 
     componentDidMount() {
@@ -79,12 +84,16 @@ class Game extends React.Component {
             const oppHp = environment[SIDE.OPPONENT]?.hp ?? 8000;
             if (myHp <= 0 && !this._gameOver) {
                 this._gameOver = true;
-                setTimeout(() => alert('💀 You lose! The opponent reduced your LP to 0.'), 200);
+                setTimeout(() => {
+                    if (this.props.onGameEnd) this.props.onGameEnd('lose');
+                }, 2000);
                 return;
             }
             if (oppHp <= 0 && !this._gameOver) {
                 this._gameOver = true;
-                setTimeout(() => alert('🏆 You win! Opponent\'s LP reached 0!'), 200);
+                setTimeout(() => {
+                    if (this.props.onGameEnd) this.props.onGameEnd('win');
+                }, 2000);
                 return;
             }
         }
@@ -101,6 +110,8 @@ class Game extends React.Component {
         // Log turn changes and update turn counter for the log
         if (current_turn !== prevProps.game_meta.current_turn) {
             setLogTurn(game_meta.turn_count || 1);
+            // Clear once-per-turn tracking via the authoritative OncePer module
+            OncePer.clearAll();
             if (is_my_turn) {
                 document.hidden
                     ? this.startTabFlash('⚔️ Your Turn!')
@@ -134,9 +145,11 @@ class Game extends React.Component {
                 if (field) {
                     let changed = false;
                     field.forEach(c => {
-                        if (c && c !== CARD_TYPE.PLACEHOLDER && (c.summoned_this_turn || c.pos_changed_this_turn)) {
+                        if (c && c !== CARD_TYPE.PLACEHOLDER && (c.summoned_this_turn || c.pos_changed_this_turn || c.attacked_this_turn || c.current_level != null)) {
                             c.summoned_this_turn = false;
                             c.pos_changed_this_turn = false;
+                            c.attacked_this_turn = false;
+                            if (c.current_level != null) delete c.current_level;
                             changed = true;
                         }
                     });
@@ -147,10 +160,10 @@ class Game extends React.Component {
                 if (is_my_turn) this.auto_next_phase(PHASE.MAIN_PHASE_1);
             } else if (current_phase === PHASE.END_PHASE) {
                 if (is_my_turn) {
-                    // Trigger end-phase pendulum effects, then advance
-                    this.triggerEndPhasePendulumEffects(environment).then(() => {
-                        this.auto_next_phase(PHASE_START);
-                    });
+                    // Trigger end-phase effects (Zenmaines destroy, Zenmaister flip restore, Pendulum)
+                    this.triggerEndPhaseMonsterEffects(environment)
+                        .then(() => this.triggerEndPhasePendulumEffects(environment))
+                        .then(() => this.auto_next_phase(PHASE_START));
                 } else {
                     this.auto_next_phase(PHASE_START);
                 }
@@ -208,6 +221,72 @@ class Game extends React.Component {
         this.props.initialize(environment);
     }
 
+    triggerEndPhaseMonsterEffects = async (environment) => {
+        const { update_environment } = require('../../Store/actions/environmentActions');
+        const storeModule = require('../../Store/store');
+        const { show_tool } = require('../../Store/actions/toolActions');
+        const { TOOL_TYPE } = require('../../Store/actions/actionTypes');
+        const { CARD_SELECT_TYPE } = require('../PlayerGround/utils/constant');
+
+        const field = environment?.[SIDE.MINE]?.[ENVIRONMENT.MONSTER_FIELD] || [];
+
+        // ── Wind-Up Zenmaines: destroy 1 card on field if protection was used ───
+        for (const m of field) {
+            if (!m || m === CARD_TYPE.PLACEHOLDER || !m.zenmaines_protection_used) continue;
+            m.zenmaines_protection_used = false;
+            const freshEnv = storeModule.default.getState().environmentReducer.environment;
+            const allCards = [
+                ...(freshEnv[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD]     || []).filter(c => c !== CARD_TYPE.PLACEHOLDER && c?.card),
+                ...(freshEnv[SIDE.OPPONENT][ENVIRONMENT.MONSTER_FIELD] || []).filter(c => c !== CARD_TYPE.PLACEHOLDER && c?.card),
+                ...(freshEnv[SIDE.MINE][ENVIRONMENT.SPELL_FIELD]       || []).filter(c => c?.card),
+                ...(freshEnv[SIDE.OPPONENT][ENVIRONMENT.SPELL_FIELD]   || []).filter(c => c?.card),
+            ];
+            if (!allCards.length) continue;
+            await new Promise((resolve, reject) =>
+                storeModule.default.dispatch(show_tool({
+                    tool_type: TOOL_TYPE.CARD_SELECTOR,
+                    info: {
+                        type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+                        label: 'Zenmaines End Phase — destroy 1 card on field',
+                        sourceList: allCards, numToSelect: 1,
+                        resolve, reject,
+                    }
+                }))
+            ).then(({ cardEnvs: [uid] }) => {
+                const e2 = storeModule.default.getState().environmentReducer.environment;
+                for (const s of [SIDE.MINE, SIDE.OPPONENT]) {
+                    for (const z of [ENVIRONMENT.MONSTER_FIELD, ENVIRONMENT.SPELL_FIELD]) {
+                        const arr = e2[s][z];
+                        for (let i = 0; i < arr.length; i++) {
+                            if (arr[i] !== CARD_TYPE.PLACEHOLDER && arr[i]?.card &&
+                                (arr[i].card?.key?.toString() + '_' + arr[i].unique_count) ===
+                                    (uid?.split?.('_')?.[0] + '_' + uid?.split?.('_')?.[1]) ||
+                                arr[i]?.card && arr[i]?.card?.key?.toString() + '_' + arr[i]?.unique_count === uid) {
+                                e2[s][ENVIRONMENT.GRAVEYARD].push(arr[i]);
+                                arr[i] = CARD_TYPE.PLACEHOLDER;
+                                break;
+                            }
+                        }
+                    }
+                }
+                storeModule.default.dispatch(update_environment(e2));
+            }).catch(() => {});
+        }
+
+        // ── Wind-Up Zenmaister: return face-down flipped monsters back to ATK ──
+        const freshEnv2 = storeModule.default.getState().environmentReducer.environment;
+        const mf2 = freshEnv2?.[SIDE.MINE]?.[ENVIRONMENT.MONSTER_FIELD] || [];
+        let changed = false;
+        for (const m of mf2) {
+            if (!m || m === CARD_TYPE.PLACEHOLDER || !m.zenmaister_flip_target) continue;
+            m.current_pos = CARD_POS.FACE;
+            delete m.zenmaister_flip_target;
+            logEvent(LOG_TYPE.EFFECT, `Zenmaister: ${m.card?.name} returned to face-up ATK`);
+            changed = true;
+        }
+        if (changed) storeModule.default.dispatch(update_environment(freshEnv2));
+    };
+
     triggerEndPhasePendulumEffects = async (environment) => {
         const pendZone = environment?.[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE] || [];
         for (const cardEnv of pendZone) {
@@ -261,6 +340,9 @@ class Game extends React.Component {
                         card_selector_info={tools[TOOL_TYPE.CARD_SELECTOR].info}
                     />
                     <ChainWindow />
+                    <PositionChooser />
+                    <LevelChooser />
+                    <EffectChooser />
                     <HealthBar side='MINE' />
                     <HealthBar side='OPPONENT' />
                     <PhaseSelector />

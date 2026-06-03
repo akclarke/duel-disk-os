@@ -82,15 +82,44 @@ const summon = (info, type, environment) => {
                 },
                 [SIDE.OPPONENT]: { ...freshEnv[SIDE.OPPONENT] },
             };
-            const result = onSummonEffect(cloned);
-            const finish = () => store.dispatch(update_environment(cloned));
+            const result = onSummonEffect(cloned, type);
             if (result && typeof result.then === 'function') {
-                result.then(finish).catch(finish);
+                // Async on_summon effects call dispatchEnv themselves —
+                // do NOT overwrite with the pre-effect snapshot after they resolve.
+                result.catch(e => console.warn('[Summon] on_summon async error:', e));
             } else {
-                finish();
+                // Sync effects mutate cloned in-place; dispatch the result.
+                store.dispatch(update_environment(cloned));
             }
         }, 350);
     }
+
+    // Fire hand-watcher triggers (e.g. Kagetokage) after every Normal Summon.
+    // Delayed to 700ms so it fires after the on_summon effect above (350ms).
+    if (type === NORMAL_SUMMON) {
+        setTimeout(() => {
+            const { fireHandWatchTriggers, TRIGGER_TYPE } = require('../../data/triggerRegistry');
+            const freshEnv = store.getState().environmentReducer.environment;
+            fireHandWatchTriggers(TRIGGER_TYPE.ON_NORMAL_SUMMON, info.card, freshEnv, info.side);
+        }, 700);
+    }
+
+    // Fire field-watcher triggers for Bushido counter cards + Wind-Up Magician etc.
+    // Fires for both Normal and Special summons.
+    {
+        const { fireFieldWatchTriggers, TRIGGER_TYPE } = require('../../data/triggerRegistry');
+        const freshEnv = store.getState().environmentReducer.environment;
+        // Spell field watchers (Bushido counters, Wind-Up Factory)
+        fireFieldWatchTriggers(TRIGGER_TYPE.ON_MONSTER_SUMMONED, info.card, freshEnv, info.side, false);
+    }
+
+    // Fire hand-watcher triggers for ALL summons (Wind-Up Shark SS from hand, etc.)
+    // Delayed 800ms — after normal-summon hand watchers (700ms)
+    setTimeout(() => {
+        const { fireHandWatchTriggers, TRIGGER_TYPE } = require('../../data/triggerRegistry');
+        const freshEnv = store.getState().environmentReducer.environment;
+        fireHandWatchTriggers(TRIGGER_TYPE.ON_MONSTER_SUMMONED, info.card, freshEnv, info.side);
+    }, 800);
 
     return environment;
 };

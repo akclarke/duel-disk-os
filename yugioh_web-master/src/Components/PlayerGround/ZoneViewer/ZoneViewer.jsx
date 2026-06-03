@@ -4,7 +4,9 @@
  */
 import React from 'react';
 import { connect } from 'react-redux';
-import { ENVIRONMENT, SIDE } from '../../Card/utils/constant';
+import { ENVIRONMENT, SIDE, CARD_POS } from '../../Card/utils/constant';
+import { update_environment } from '../../../Store/actions/environmentActions';
+import { fireTrigger, TRIGGER_TYPE } from '../../../data/triggerRegistry';
 
 const ZONE_LABELS = {
     gy_mine:       '🪦 My Graveyard',
@@ -35,6 +37,22 @@ class ZoneViewer extends React.Component {
     };
 
     selectCard = (cardEnv) => this.setState({ selected: cardEnv });
+
+    activateScale = () => {
+        const { environment, dispatch_update_environment } = this.props;
+        const { selected } = this.state;
+        if (!selected) return;
+        const pendZone = environment[SIDE.MINE][ENVIRONMENT.PENDULUM_ZONE];
+        const activated = { ...selected, current_pos: CARD_POS.FACE };
+        const newZone = pendZone.map(c => c === selected ? activated : c);
+        const newEnv = {
+            ...environment,
+            [SIDE.MINE]: { ...environment[SIDE.MINE], [ENVIRONMENT.PENDULUM_ZONE]: newZone },
+        };
+        dispatch_update_environment(newEnv);
+        this.setState({ selected: activated });
+        fireTrigger(TRIGGER_TYPE.ON_PENDULUM_PLACED, activated, newEnv, SIDE.MINE);
+    };
 
     render() {
         const { zone, onClose } = this.props;
@@ -173,8 +191,17 @@ class ZoneViewer extends React.Component {
                                     </div>
                                 )}
 
-                                {/* Pendulum zone activate button */}
-                                {zone === 'pendulum_mine' && sc.pendulumEffect && (
+                                {/* Activate face-down pendulum as a scale */}
+                                {zone === 'pendulum_mine' && selected?.current_pos === CARD_POS.SET && (
+                                    <button onClick={(e) => { e.stopPropagation(); this.activateScale(); }}
+                                        style={{
+                                            background: '#1a3a1a', border: '1px solid #40a040',
+                                            color: '#80e080', borderRadius: 6,
+                                            padding: '6px 14px', fontSize: 12, cursor: 'pointer', alignSelf: 'flex-start'
+                                        }}>▲ Activate as Pendulum Scale (flip face-up)</button>
+                                )}
+                                {/* Pendulum zone activate effect button */}
+                                {zone === 'pendulum_mine' && selected?.current_pos === CARD_POS.FACE && sc.pendulumEffect && (
                                     <button onClick={(e) => {
                                         e.stopPropagation();
                                         if (typeof sc.pendulumEffect === 'function') {
@@ -218,4 +245,8 @@ const mapStateToProps = state => ({
     environment: state.environmentReducer.environment
 });
 
-export default connect(mapStateToProps)(ZoneViewer);
+const mapDispatchToProps = dispatch => ({
+    dispatch_update_environment: (env) => dispatch(update_environment(env)),
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(ZoneViewer);

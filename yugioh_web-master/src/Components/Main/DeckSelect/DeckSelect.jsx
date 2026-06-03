@@ -9,6 +9,7 @@
 
 import React from 'react';
 import { getAllDecks } from '../../../data/deckRegistry';
+import { loadCustomDecks } from '../../../data/customDecks';
 import './DeckSelect.css';
 
 // Era color coding
@@ -30,9 +31,22 @@ class DeckSelect extends React.Component {
     }
 
     render() {
-        const { title, onSelect, onBack, selectedDeckId } = this.props;
+        const { title, onSelect, onBack, selectedDeckId, onBuildDeck } = this.props;
         const { hoveredDeck } = this.state;
-        const decks = getAllDecks();
+        const presetDecks = getAllDecks();
+        const customDecks = loadCustomDecks();
+        // Custom decks with the same ID as a preset override that preset.
+        // Pure custom decks (no preset match) appear after the presets.
+        const overriddenIds = new Set(customDecks.map(d => d.id));
+        const decks = [
+            ...presetDecks
+                .map(d => overriddenIds.has(d.id)
+                    ? { ...customDecks.find(c => c.id === d.id), available: true }
+                    : d),
+            ...customDecks
+                .filter(d => !presetDecks.some(p => p.id === d.id))
+                .map(d => ({ ...d, available: true })),
+        ];
 
         const previewDeck = hoveredDeck || decks.find(d => d.id === selectedDeckId) || null;
 
@@ -41,7 +55,17 @@ class DeckSelect extends React.Component {
                 <div className="deck_select_header">
                     <button className="deck_select_back" onClick={onBack}>← Back</button>
                     <h2>{title || 'Select Your Deck'}</h2>
-                    <div style={{width: 80}} /> {/* spacer */}
+                    {onBuildDeck ? (
+                        <button
+                            className="deck_select_back"
+                            onClick={() => onBuildDeck(null)}
+                            style={{ color: '#f0c040', borderColor: 'rgba(240,192,64,0.4)' }}
+                        >
+                            🃏 Build Deck
+                        </button>
+                    ) : (
+                        <div style={{width: 80}} />
+                    )}
                 </div>
 
                 <div className="deck_select_body">
@@ -94,6 +118,15 @@ class DeckSelect extends React.Component {
                                             onClick={() => onSelect(previewDeck)}>
                                             Select This Deck
                                         </button>
+                                        {previewDeck.isCustom && onBuildDeck && (
+                                            <button
+                                                className="deck_select_back"
+                                                onClick={() => onBuildDeck(previewDeck)}
+                                                style={{ marginTop: 8, color: '#aaf', borderColor: 'rgba(160,160,255,0.35)', fontSize: '0.8rem' }}
+                                            >
+                                                ✏️ Edit Deck
+                                            </button>
+                                        )}
                                     </>
                                 ) : (
                                     <div className="deck_preview_coming_soon">

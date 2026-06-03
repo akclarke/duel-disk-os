@@ -12,7 +12,7 @@
  */
 
 const API_BASE = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
-const CACHE_VERSION = '2';
+const CACHE_VERSION = '3';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // ─── CACHE HELPERS ────────────────────────────────────────────────────────────
@@ -160,6 +160,35 @@ export const getCardImageUrl = (apiCard) => {
     return apiCard?.card_images?.[0]?.image_url_small
         || apiCard?.card_images?.[0]?.image_url
         || 'https://ms.yugipedia.com//f/fd/Back-Anime-ZX-2.png';
+};
+
+/**
+ * Search cards by name (fuzzy) with optional type/attribute/level filters.
+ * Uses YGOPRODeck's fname parameter. Returns up to 100 raw API card objects.
+ *
+ * filters: { type?: string, attribute?: string, level?: number, race?: string }
+ * type examples: "Effect Monster", "Normal Spell Card", "Trap Card"
+ */
+export const searchCards = async (query, filters = {}) => {
+    const params = new URLSearchParams();
+    const q = query?.trim();
+    if (q) params.set('fname', q);
+    if (filters.type)      params.set('type', filters.type);
+    if (filters.attribute) params.set('attribute', filters.attribute);
+    if (filters.level)     params.set('level', String(filters.level));
+    if (filters.race)      params.set('race', filters.race);
+
+    if (!q && !filters.type && !filters.attribute && !filters.level && !filters.race) {
+        return [];
+    }
+
+    const res = await fetch(`${API_BASE}?${params.toString()}&num=80&offset=0`);
+    if (!res.ok) {
+        if (res.status === 400) return []; // no results
+        throw new Error(`Card search failed: ${res.status}`);
+    }
+    const json = await res.json();
+    return json.data || [];
 };
 
 /**

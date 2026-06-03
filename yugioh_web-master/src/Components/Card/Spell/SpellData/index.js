@@ -12,6 +12,7 @@ import store from '../../../../Store/store';
 import {update_environment} from '../../../../Store/actions/environmentActions'
 import { NORMAL_SUMMON, TOOL_TYPE } from '../../../../Store/actions/actionTypes';
 import { show_tool } from '../../../../Store/actions/toolActions';
+import { choosePosition } from '../../../../data/positionChooser';
 //import { SubwayRounded } from '@material-ui/icons';
 
 export const spell_database = {
@@ -76,20 +77,21 @@ export const spell_database = {
                     // tools.call_card_selector(info_card_selector)
                     store.dispatch(show_tool(info_card_selector))
                 }).then((result) => {
-                    effect1.target(environment, result.cardEnvs[0]).then((targets) => {
+                    effect1.target(environment, result.cardEnvs[0]).then(async (targets) => {
                         for (const material of targets.cardEnvs) {
                             // const { unique_id, location } = material
                             environment = Core.Misc.move_cards_to_graveyard([material], SIDE.MINE, ENVIRONMENT.HAND, environment)
                         }
                         //force update
                         store.dispatch(update_environment(environment))
-        
-                        const wantsDef = window.confirm('Summon in Defense position? (Cancel = Attack position)');
+
+                        const targetCard = Core.Utils.get_cardEnv_by_unique_id(environment, SIDE.MINE, ENVIRONMENT.EXTRA_DECK, result.cardEnvs[0]);
+                        const pos = await choosePosition(targetCard?.card?.name || 'Monster');
                         const info = {
-                            card: Core.Utils.get_cardEnv_by_unique_id(environment, SIDE.MINE, ENVIRONMENT.EXTRA_DECK, result.cardEnvs[0]),
+                            card: targetCard,
                             src_location: ENVIRONMENT.EXTRA_DECK,
                             side: SIDE.MINE,
-                            position: wantsDef ? 'DEFENSE' : 'FACE',
+                            position: pos,
                         }
 
                         Core.Summon.summon(info, NORMAL_SUMMON, environment)

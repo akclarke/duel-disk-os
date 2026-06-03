@@ -76,7 +76,7 @@ class CardSelector extends React.Component {
 
     xyzMaterials = (reqLevel) =>
         this.monsters(SIDE.MINE, ENVIRONMENT.MONSTER_FIELD)
-            .filter(c => (c.card.level || 0) === reqLevel);
+            .filter(c => (c.current_level ?? c.card.level ?? 0) === reqLevel);
 
     pendulumScaleCards = () =>
         (this.props.environment?.[SIDE.MINE]?.[ENVIRONMENT.HAND] || [])
@@ -105,9 +105,9 @@ class CardSelector extends React.Component {
             case CARD_SELECT_TYPE.CARD_SELECT_SPECIAL_SUMMON_MATERIALS:
                 return { title: `Select ${num_to_select} Fusion Material(s)`, num: num_to_select || 2, cards: card_selector_info.materials || [] };
             case CARD_SELECT_TYPE.CARD_SELECT_FROM_DECK:
-                return { title: label || 'Select 1 card from your Deck', num: numToSelect || 1, cards: this.deckCards(filterFn) };
+                return { title: label || 'Select 1 card from your Deck', num: numToSelect || 1, cards: sourceList || this.deckCards(filterFn) };
             case CARD_SELECT_TYPE.CARD_SELECT_FROM_GY:
-                return { title: label || 'Select 1 monster from your Graveyard', num: numToSelect || 1, cards: this.gyMonsters() };
+                return { title: label || 'Select 1 monster from your Graveyard', num: numToSelect || 1, cards: sourceList || this.gyMonsters() };
             case CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND:
                 return { title: label || 'Select 1 card from your hand', num: numToSelect || 1, cards: sourceList || this.monsters(SIDE.MINE, ENVIRONMENT.HAND) };
             case CARD_SELECT_TYPE.CARD_SELECT_RITUAL_MONSTER: {
@@ -120,28 +120,64 @@ class CardSelector extends React.Component {
                 const field = this.monsters(SIDE.MINE, ENVIRONMENT.MONSTER_FIELD);
                 return { title: `Select tributes (total level ≥ ${requiredLevel})`, num: 99, cards: [...hand, ...field], flexible: true, requiredLevel };
             }
-            case CARD_SELECT_TYPE.CARD_SELECT_SYNCHRO_TARGET:
-                return { title: 'Select Synchro Monster to summon', num: 1, cards: this.monsters(SIDE.MINE, ENVIRONMENT.EXTRA_DECK).filter(c => c?.card?.card_type === 'MONSTER_SYNCHRO') };
+            case CARD_SELECT_TYPE.CARD_SELECT_SYNCHRO_TARGET: {
+                // Only show Synchro monsters whose level can be reached with current field
+                const field = this.monsters(SIDE.MINE, ENVIRONMENT.MONSTER_FIELD);
+                const tuners    = field.filter(c => c.card?.isTuner);
+                const nonTuners = field.filter(c => !c.card?.isTuner);
+                const viableSynchro = this.monsters(SIDE.MINE, ENVIRONMENT.EXTRA_DECK).filter(c => {
+                    if (c?.card?.card_type !== 'MONSTER_SYNCHRO') return false;
+                    const target = c.card.level || 0;
+                    // At least one tuner + at least one non-tuner must sum to target level
+                    for (const tuner of tuners) {
+                        const tunerLv = tuner.card.level || 0;
+                        const need    = target - tunerLv;
+                        if (need <= 0) continue;
+                        // Can a subset of non-tuners sum exactly to need?
+                        const nonTunerLevels = nonTuners.map(m => m.card.level || 0);
+                        if (nonTunerLevels.some(l => l === need)) return true;
+                        if (nonTunerLevels.reduce((s, l) => s + l, 0) >= need) return true;
+                    }
+                    return false;
+                });
+                return { title: 'Select Synchro Monster to summon', num: 1, cards: viableSynchro };
+            }
             case CARD_SELECT_TYPE.CARD_SELECT_SYNCHRO_MATERIALS:
                 return { title: `Select materials (Tuner + others, total level = ${requiredLevel})`, num: 99, cards: this.monsters(SIDE.MINE, ENVIRONMENT.MONSTER_FIELD), flexible: true, requiredLevel, synchro: true };
-            case CARD_SELECT_TYPE.CARD_SELECT_XYZ_TARGET:
-                return { title: 'Select XYZ Monster to summon', num: 1, cards: this.monsters(SIDE.MINE, ENVIRONMENT.EXTRA_DECK).filter(c => c?.card?.card_type === 'MONSTER_XYZ') };
+            case CARD_SELECT_TYPE.CARD_SELECT_XYZ_TARGET: {
+                // Only show XYZ monsters that have enough field monsters at the matching level/rank
+                const fieldXyz = this.monsters(SIDE.MINE, ENVIRONMENT.MONSTER_FIELD);
+                const viableXyz = this.monsters(SIDE.MINE, ENVIRONMENT.EXTRA_DECK).filter(c => {
+                    if (c?.card?.card_type !== 'MONSTER_XYZ') return false;
+                    const rank    = c.card.rank || c.card.level || 0;
+                    const numMats = c.card.xyz_material_count || 2;
+                    const matching = fieldXyz.filter(m => (m.current_level ?? m.card.level ?? 0) === rank);
+                    return matching.length >= numMats;
+                });
+                return { title: 'Select XYZ Monster to summon', num: 1, cards: viableXyz };
+            }
             case CARD_SELECT_TYPE.CARD_SELECT_XYZ_MATERIALS:
                 return { title: `Select ${numToSelect || 2} Level-${requiredLevel} monsters`, num: numToSelect || 2, cards: this.xyzMaterials(requiredLevel) };
             case CARD_SELECT_TYPE.CARD_SELECT_PENDULUM_SCALE:
                 return { title: 'Select a Pendulum Monster to place in the Pendulum Zone', num: 1, cards: this.pendulumScaleCards() };
             case CARD_SELECT_TYPE.CARD_SELECT_PENDULUM_TARGETS: {
                 const env = this.props.environment;
-                const leftScale  = env?.[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE]?.[0]?.card?.scale ?? null;
-                const rightScale = env?.[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE]?.[1]?.card?.scale ?? null;
-                if (leftScale === null || rightScale === null) return { title: 'Set both pendulum scales first', num: 0, cards: [] };
+                const zones = env?.[SIDE.MINE]?.[ENVIRONMENT.PENDULUM_ZONE] || [null, null];
+                const leftScale  = zones[0]?.current_pos === CARD_POS.FACE ? (zones[0]?.card?.scale ?? null) : null;
+                const rightScale = zones[1]?.current_pos === CARD_POS.FACE ? (zones[1]?.card?.scale ?? null) : null;
+                if (leftScale === null || rightScale === null) return { title: 'Set both face-up pendulum scales first', num: 0, cards: [] };
                 const lo = Math.min(leftScale, rightScale);
                 const hi = Math.max(leftScale, rightScale);
-                const valid = (env?.[SIDE.MINE]?.[ENVIRONMENT.EXTRA_DECK] || [])
-                    .concat(env?.[SIDE.MINE]?.[ENVIRONMENT.HAND] || [])
+                // Any monster from hand within scale range (pendulum rules allow any monster, not just pendulums)
+                const fromHand = (env?.[SIDE.MINE]?.[ENVIRONMENT.HAND] || [])
+                    .filter(c => c?.card?.card_type?.startsWith('MONSTER')
+                        && (c.card.level || 0) > lo && (c.card.level || 0) < hi);
+                // Pendulum monsters from Extra Deck within scale range
+                const fromExtra = (env?.[SIDE.MINE]?.[ENVIRONMENT.EXTRA_DECK] || [])
                     .filter(c => c?.card && c.card.card_type === 'MONSTER_PENDULUM'
                         && (c.card.level || 0) > lo && (c.card.level || 0) < hi);
-                return { title: `Pendulum Summon monsters between scales ${lo}–${hi}`, num: valid.length, cards: valid, flexible: true, minSelect: 1 };
+                const valid = [...fromHand, ...fromExtra];
+                return { title: `Pendulum Summon (scales ${lo}–${hi}) — select any number`, num: valid.length, cards: valid, flexible: true, minSelect: 1 };
             }
             case CARD_SELECT_TYPE.CARD_SELECT_LINK_TARGET:
                 return { title: 'Select a Link Monster to summon', num: 1, cards: this.monsters(SIDE.MINE, ENVIRONMENT.EXTRA_DECK).filter(c => c?.card?.card_type === 'MONSTER_LINK') };

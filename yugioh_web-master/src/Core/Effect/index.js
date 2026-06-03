@@ -51,7 +51,10 @@ const activate = (cardEnv, src_location, side, environment) => {
     if (OfflineAdapter.isEnabled()) {
         // Offline: execute the effect immediately without waiting for socket
         const uid = get_unique_id_from_ennvironment(cardEnv);
-        const effect = cardEnv.card.effects?.[0];
+        // Find the first effect whose condition currently passes, not necessarily [0]
+        const effect = (cardEnv.card.effects || []).find(e =>
+            typeof e.condition === 'function' ? e.condition(store.getState().environmentReducer.environment) : true
+        ) ?? cardEnv.card.effects?.[0];
         if (effect) {
             // Small delay so the card visually appears on the field first
             setTimeout(() => {

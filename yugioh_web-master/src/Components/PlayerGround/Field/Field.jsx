@@ -4,7 +4,7 @@ import Side from './Side/Side';
 import { end_battle, opponent_attack_ack } from "../../../Store/actions/battleMetaActions";
 import { emit_attack_ack } from '../../../Client/Sender';
 import { OfflineAdapter } from '../../../Client/OfflineAdapter';
-import { SIDE, ENVIRONMENT } from '../../Card/utils/constant';
+import { SIDE, ENVIRONMENT, CARD_TYPE } from '../../Card/utils/constant';
 import { DST_DIRECT_ATTACK, BATTLE_STEP } from '../utils/constant';
 import { perform_attack, update_environment } from '../../../Store/actions/environmentActions';
 import Core from '../../../Core';
@@ -120,23 +120,30 @@ class Field extends React.Component {
             },
         };
 
-        // Remove the activated trap from the S/T field → GY
+        // Only remove from S/T field if it's actually a spell/trap (not a face-up monster like Knight)
         const stField = cloned[SIDE.MINE][ENVIRONMENT.SPELL_FIELD];
         const trapSlotIdx = stField.findIndex(c =>
             c?.card && get_unique_id_from_ennvironment(c) === get_unique_id_from_ennvironment(cardEnv));
         if (trapSlotIdx !== -1) {
             cloned[SIDE.MINE][ENVIRONMENT.GRAVEYARD].push(stField[trapSlotIdx]);
-            stField[trapSlotIdx] = { card: null };
+            stField[trapSlotIdx] = CARD_TYPE.PLACEHOLDER;
         }
+
+        // Attack-negating effects (e.g. Wind-Up Knight) cancel the battle entirely
+        const negatesAttack = trigger.negates_attack === true;
 
         const finish = () => {
             this.props.dispatch_update_environment(cloned);
             this.setState({ trap_window: null, trap_resolved: true });
-            // Short pause so player can see result, then proceed to damage step
-            setTimeout(() => {
-                const curr = this.props.battle_meta;
-                if (curr) this._proceedToDamageStep(isOpponentAttack, isOffline);
-            }, 600);
+            if (negatesAttack) {
+                // End battle without proceeding to damage step
+                this.props.dispatch_end_battle();
+            } else {
+                setTimeout(() => {
+                    const curr = this.props.battle_meta;
+                    if (curr) this._proceedToDamageStep(isOpponentAttack, isOffline);
+                }, 600);
+            }
         };
 
         try {

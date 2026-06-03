@@ -6,7 +6,7 @@
 import { ENVIRONMENT, SIDE, CARD_TYPE, CARD_POS } from '../../Components/Card/utils/constant';
 import { DST_DIRECT_ATTACK } from '../../Components/PlayerGround/utils/constant';
 import { get_unique_id_from_ennvironment } from '../../Components/PlayerGround/utils/utils';
-import { fireTrigger, TRIGGER_TYPE } from '../../data/triggerRegistry';
+import { fireTrigger, fireFieldWatchTriggers, TRIGGER_TYPE } from '../../data/triggerRegistry';
 import { logEvent, LOG_TYPE } from '../../data/duelLog';
 
 const isDefPos = (cardEnv) =>
@@ -28,10 +28,18 @@ const tryProtect = (cardEnv, env, side) => {
 };
 
 const battle_to_graveyard = (cardEnv, side, index, env) => {
-    env[side][ENVIRONMENT.GRAVEYARD].push(cardEnv);
+    // Allow the card to protect itself (e.g. Wind-Up Zenmaines detaches material instead)
+    if (cardEnv?.card?.can_protect_from_destroy?.(cardEnv)) {
+        env = cardEnv.card.protect_from_destroy(cardEnv, env, side);
+        return env;
+    }
+    const isPendulum = cardEnv?.card?.card_type === 'MONSTER_PENDULUM';
+    const dest = isPendulum ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.GRAVEYARD;
+    env[side][dest].push(cardEnv);
     env[side][ENVIRONMENT.MONSTER_FIELD][index] = CARD_TYPE.PLACEHOLDER;
-    // Fire ON_DESTROY trigger
     fireTrigger(TRIGGER_TYPE.ON_DESTROY, cardEnv, env, side);
+    // Let allied field monsters react to the destruction (e.g. Wind-Up Carrier Zenmaity)
+    fireFieldWatchTriggers(TRIGGER_TYPE.ON_ALLY_DESTROYED, cardEnv, env, side, true);
     return env;
 };
 
@@ -42,9 +50,15 @@ const battle = (info, environment) => {
     const attacker = environment[side][ENVIRONMENT.MONSTER_FIELD][src_index];
     const defender = environment[defSide][ENVIRONMENT.MONSTER_FIELD][dst_index];
 
+    if (attacker) attacker.attacked_this_turn = true;
+
+    // Battle damage multiplier (Odd-Eyes Pendulum Dragon, Supreme King Dragon Odd-Eyes, etc.)
+    const dmgMult = attacker?.card?.battle_damage_multiplier ?? 1;
+
     // ── Direct attack ─────────────────────────────────────────────────────────
     if (dst === DST_DIRECT_ATTACK) {
-        const dmg = attacker?.current_atk ?? attacker?.card?.atk ?? 0;
+        const baseDmg = attacker?.current_atk ?? attacker?.card?.atk ?? 0;
+        const dmg = Math.round(baseDmg * dmgMult);
         environment[defSide].hp -= dmg;
         const atkName = attacker?.card?.name || '?';
         logEvent(LOG_TYPE.ATTACK, `${atkName} attacks directly for ${dmg} damage`, { cardName: atkName, damage: dmg });
@@ -65,6 +79,8 @@ const battle = (info, environment) => {
             if (!tryProtect(defender, environment, defSide)) {
                 environment = battle_to_graveyard(defender, defSide, dst_index, environment);
                 logEvent(LOG_TYPE.SEND_GY, `${defName} destroyed by battle`, { cardName: defName });
+                // Fire ON_BATTLE_DESTROY on the attacker so attacker-based triggers can respond
+                fireTrigger(TRIGGER_TYPE.ON_BATTLE_DESTROY, attacker, environment, side, { destroyedCard: defender });
             }
         } else if (atkATK === defDEF) {
             logEvent(LOG_TYPE.ATTACK, `${atkName} vs ${defName} — ATK = DEF, no result`);
@@ -80,8 +96,10 @@ const battle = (info, environment) => {
             if (!tryProtect(defender, environment, defSide)) {
                 environment = battle_to_graveyard(defender, defSide, dst_index, environment);
                 logEvent(LOG_TYPE.SEND_GY, `${defName} destroyed by battle`, { cardName: defName });
+                fireTrigger(TRIGGER_TYPE.ON_BATTLE_DESTROY, attacker, environment, side, { destroyedCard: defender });
             }
-            const dmg = atkATK - defATK;
+            const baseDmg = atkATK - defATK;
+            const dmg = Math.round(baseDmg * dmgMult);
             environment[defSide].hp -= dmg;
             logEvent(LOG_TYPE.DAMAGE, `Opponent takes ${dmg} damage (LP: ${environment[defSide].hp})`, { amount: dmg });
             fireTrigger(TRIGGER_TYPE.ON_BATTLE_DAMAGE, attacker, environment, side);

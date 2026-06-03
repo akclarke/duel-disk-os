@@ -57,9 +57,8 @@ export const DECK_REGISTRY = {
     // ─── DARK MAGICIAN ───────────────────────────────────────────────────────
     // Verified IDs:
     //   Dark Magician 46986414 | Buster Blader 78193831 | DM Girl 70903634
-    //   Skilled DM 73752131 | Magician of Dark Illusion 97077563
-    //   Apprentice Magician 80070805 | Dark Magician of Chaos 40737112
-    //   Dark Paladin 98502113 | Dark Magic Attack 2314238 | Thousand Knives 63519819
+    //   Skilled DM 73752131 | Apprentice Magician 9156135 | Dark Magician of Chaos 40737112
+    //   Dark Paladin 98502113 | Dark Magic Attack 2314238 | Thousand Knives 63391643
     //   Dark Magic Curtain 99789342 | Monster Reborn 83764718 | Dark Hole 53129443
     //   Raigeki 12580477 | Polymerization 24094653
     //   Dian Keto 84257639 | Graceful Dice 74137509 | Pot of Greed 55144522
@@ -76,9 +75,8 @@ export const DECK_REGISTRY = {
             46986414, 46986414, 46986414, // Dark Magician x3
             78193831, 78193831,           // Buster Blader x2
             70903634, 70903634, 70903634, // Dark Magician Girl x3
-            73752131, 73752131,           // Skilled Dark Magician x2
-            // 97077563 WRONG — Magician of Dark Illusion ID unknown, check physical card
-            80070805, 80070805,           // Apprentice Magician x2
+            73752131, 73752131, 73752131, // Skilled Dark Magician x3
+            9156135,  9156135,            // Apprentice Magician x2
             40737112,                     // Dark Magician of Chaos
             // Spells (24)
             24094653, 24094653, 24094653, // Polymerization x3
@@ -86,12 +84,12 @@ export const DECK_REGISTRY = {
             53129443,                     // Dark Hole
             12580477,                     // Raigeki
             2314238,  2314238,            // Dark Magic Attack x2
-            63519819, 63519819,           // Thousand Knives x2
+            63391643, 63391643,           // Thousand Knives x2
             99789342,                     // Dark Magic Curtain
             84257639, 84257639,           // Dian Keto the Cure Master x2
             74137509, 74137509,           // Graceful Dice x2
             55144522,                     // Pot of Greed
-            89943723,                     // Elemental HERO Neos
+            9156135,                      // Apprentice Magician x3
             44095762,                     // Mirror Force
             56120475, 56120475, 56120475, // Sakuretsu Armor x3
             62279055, 62279055,           // Magic Cylinder x2
@@ -171,7 +169,7 @@ export const DECK_REGISTRY = {
             12580477,                     // Raigeki
             83764718,                     // Monster Reborn
             55144522,                     // Pot of Greed
-            89943723,                     // Elemental HERO Neos
+            31733941,                     // Red-Eyes Toon Dragon x3
             44095762,                     // Mirror Force
             56120475, 56120475, 56120475, // Sakuretsu Armor x3
             62279055, 62279055,           // Magic Cylinder x2
@@ -281,8 +279,8 @@ export const DECK_REGISTRY = {
     //   2. Do the same for a second pendulum with a DIFFERENT scale number
     //   3. Once both zones filled, click 🔮 Pendulum → pick any monsters with level
     //      strictly BETWEEN the two scale numbers to summon all at once
-    // Scales in this deck: Monkeyboard=1, Pendulum Sorcerer=2, Odd-Eyes=4, Lizardraw=6, Skullcrobat=8
-    // Best combo: Scale 1 (Monkeyboard) + Scale 8 (Skullcrobat) → summon levels 2-7
+    // Scales: Monkeyboard(17330916)=1 Lv6 | Pend.Sorcerer(47075569)=2 Lv4 | Odd-Eyes(16178681)=4 Lv7 | Lizardraw(73130445)=6 Lv3 | Skullcrobat(40318957)=8 Lv4
+    // Best combo: Scale 1 (Monkeyboard) + Scale 8 (Skullcrobat) → Pendulum Summon levels 2-7 from hand/Extra Deck
     PERFORMAPAL_ODD_EYES: {
         id: 'PERFORMAPAL_ODD_EYES',
         name: 'Performapal Odd-Eyes',
@@ -300,7 +298,7 @@ export const DECK_REGISTRY = {
             // ── Non-Pendulum Monsters (4) ──────────────────────────────────
             26202165,                     // Sangan
             78010363,                     // Witch of the Black Forest
-            89943723, 89943723,           // Elemental HERO Neos x2
+            53025096, 53025096,           // Odd-Eyes Dragon x2  (Lv7, DARK Dragon — normal summon target/tribute)
             // ── Spells (12) ────────────────────────────────────────────────
             83764718, 83764718,           // Monster Reborn x2
             53129443,                     // Dark Hole
@@ -339,10 +337,10 @@ export const DECK_REGISTRY = {
             9523599,  9523599,  9523599,  // Stack Reviver x3          (Lv1, revive from GY)
             10705656, 10705656, 10705656, // Widget Kid x3             (Lv3)
             36694815, 36694815, 36694815, // Bitrooper x3              (Lv4)
-            // ── Generic Monsters (4) ───────────────────────────────────────
+            // ── Generic Cyberse (4) ────────────────────────────────────────
             26202165,                     // Sangan
             78010363,                     // Witch of the Black Forest
-            89943723, 89943723,           // Elemental HERO Neos x2
+            16188701, 16188701,           // Lady Debug x2  (Lv4 Cyberse — search Cyberse from deck)
             // ── Spells (12) ────────────────────────────────────────────────
             83764718, 83764718,           // Monster Reborn x2
             53129443,                     // Dark Hole

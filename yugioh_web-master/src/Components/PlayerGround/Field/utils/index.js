@@ -88,11 +88,13 @@ export const constructFieldFromEnv = (side, environment) => {
     let count = -1
     let field_cards = new Array(field_size).fill(null).map((_, index) =>  {        
         if (special_indexes.includes(index)) {
-            // deadling with special indexes
             if (index == graveyard_index) {
-                return environment[side][ENVIRONMENT.GRAVEYARD]
-            } 
-            return CARD_TYPE.PLACEHOLDER
+                return environment[side][ENVIRONMENT.GRAVEYARD];
+            }
+            if (index == extra_deck_index) {
+                return environment[side][ENVIRONMENT.EXTRA_DECK] || [];
+            }
+            return CARD_TYPE.PLACEHOLDER;
         } else {
             count++
             return cards[count]
@@ -109,14 +111,19 @@ export const returnAttackStatus = (cardEnv, game_meta, environment) => {
     const enabled_class = 'show_summon'
 
     // Not battle phase, not a monster, OR not your turn — disable all attacks
-    if (!cardEnv.card || 
-        game_meta.current_phase !== PHASE.BATTLE_PHASE || 
+    if (!cardEnv.card ||
+        game_meta.current_phase !== PHASE.BATTLE_PHASE ||
         !is_monster(cardEnv.card.card_type) ||
         game_meta.current_turn !== game_meta.my_id) {   // <-- turn check added
             return {
                 can_direct_attack: disabled_class,
                 can_others_attack: disabled_class
             }
+    }
+
+    // Monster already attacked this turn — one attack per battle phase
+    if (cardEnv.attacked_this_turn) {
+        return { can_direct_attack: disabled_class, can_others_attack: disabled_class }
     }
 
     // If there is a monster on the opponent's field, must attack a monster
