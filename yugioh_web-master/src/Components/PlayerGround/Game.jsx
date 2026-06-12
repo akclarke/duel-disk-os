@@ -10,6 +10,7 @@ import { PHASE, PHASE_START } from '../PlayerGround/utils/constant'
 import { emit_change_phase } from '../../Client/Sender'
 import { logEvent, LOG_TYPE, setLogTurn } from '../../data/duelLog';
 import OncePer from '../../Core/OncePer';
+import PhaseEvents from '../../Core/PhaseEvents';
 import Field from './Field/Field.jsx';
 import Hand from './Hand/Hand.jsx';
 import DuelLog from './DuelLog/DuelLog';
@@ -105,6 +106,9 @@ class Game extends React.Component {
         if (current_phase !== prevProps.game_meta.current_phase) {
             const who = is_my_turn ? 'Your' : "Opponent's";
             logEvent(LOG_TYPE.PHASE, `${who} ${current_phase.replace(/_/g, ' ')}`, { phase: current_phase });
+            // Run phase-scheduled effects (banishUntil returns, temp-boost expiry,
+            // onPhase card triggers) — both players' phases funnel through here
+            PhaseEvents.firePhase(current_phase, is_my_turn);
         }
 
         // Log turn changes and update turn counter for the log

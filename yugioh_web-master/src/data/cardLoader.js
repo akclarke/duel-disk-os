@@ -52,6 +52,7 @@ const buildMonsterCard = (id, apiCard, cardType) => {
         // and passive_effect/can_hand_ss in another.
         passive_effect:           effects.reduce((f, e) => f ?? e.passive_effect,           null) ?? null,
         on_summon:                effects.reduce((f, e) => f ?? e.on_summon,                null) ?? null,
+        on_flip:                  effects.reduce((f, e) => f ?? e.on_flip,                  null) ?? null,
         can_normal_summon:         buildCanNormalSummon(level, cardType),
         can_special_summon:        effects.reduce((f, e) => f ?? e.can_hand_ss,              null) || (() => false),
         can_protect_from_destroy:  effects.reduce((f, e) => f ?? e.can_protect_from_destroy, null) ?? null,

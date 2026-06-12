@@ -31,6 +31,12 @@ import {
     onBattleDamage, onAttackDeclared, whileOnField,
     // Shortcuts
     floater, recruiter, drawSpell, nuke, raigeki, burn, collectiveBoost,
+    // Rulebook primitives (engine-hooked)
+    sendToGY, salvage, toDeck, shuffleDeck, banishUntil, banishFaceDown,
+    summonToken, takeControl, tributeCost, addCounter, removeCounter, getCounter,
+    boostStats, setStats, destroyCards,
+    quickEffect, counterTrap, oncePerDuel, onPhase, onFlip,
+    protectFromBattleDestroy, damageMultiplier, equipTo, PHASE,
 } from './effectFactory';
 
 // ─── INTERNAL HELPERS ────────────────────────────────────────────────────────
@@ -282,9 +288,18 @@ export const EFFECTS_REGISTRY = {
     // Pot of Greed (55144522) — draw 2 cards
     55144522: drawSpell(2),
 
-    // Graceful Charity (74137509 — draw 3, discard 2
-    74137509: onActivate(sequence(drawCards(3), discardFromHand(2,
+    // Graceful Charity (79571449) — draw 3, discard 2
+    79571449: onActivate(sequence(drawCards(3), discardFromHand(2,
         {}, 'Graceful Charity — discard 2 cards'))),
+
+    // Graceful Dice (74137509) — Quick-Play: roll a d6; all your monsters gain
+    // (result × 100) ATK until the End Phase. (Was mislabeled as Graceful
+    // Charity — 74137509 is Dice; Charity is 79571449.)
+    74137509: onActivate((env, side = SIDE.MINE) => {
+        const roll = 1 + Math.floor(Math.random() * 6);
+        logEvent(LOG_TYPE.EFFECT, `Graceful Dice: rolled ${roll} — your monsters gain ${roll * 100} ATK until the End Phase`);
+        boostStats({ atk: roll * 100 }, { side: 'MINE', until: PHASE.END_PHASE })(env, side);
+    }),
 
     // Heavy Storm (19613556) — destroy all spells/traps
     19613556: onActivate(destroySpellsTraps({ side: 'BOTH' }),
@@ -293,38 +308,16 @@ export const EFFECTS_REGISTRY = {
         )
     ),
 
-    // Mystical Space Typhoon (5318639) — Quick-Play: target ANY Spell/Trap on the field; destroy it
-    5318639: onActivate(async (env) => {
-        const allST = [
-            ...(env[SIDE.MINE][ENVIRONMENT.SPELL_FIELD]     || []).filter(c => c?.card),
-            ...(env[SIDE.OPPONENT][ENVIRONMENT.SPELL_FIELD] || []).filter(c => c?.card),
-        ];
-        if (!allST.length) return;
-        try {
-            const result = await openSelector({
-                type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
-                label: 'Mystical Space Typhoon — target 1 Spell/Trap on the field',
-                sourceList: allST, numToSelect: 1,
-            });
-            if (!result?.cardEnvs?.length) return;
-            const freshEnv = store.getState().environmentReducer.environment;
-            for (const s of [SIDE.MINE, SIDE.OPPONENT]) {
-                const sf = freshEnv[s][ENVIRONMENT.SPELL_FIELD];
-                for (let i = 0; i < sf.length; i++) {
-                    if (sf[i]?.card && get_unique_id_from_ennvironment(sf[i]) === result.cardEnvs[0]) {
-                        const destroyed = sf[i];
-                        freshEnv[s][ENVIRONMENT.GRAVEYARD].push(destroyed);
-                        sf[i] = CARD_TYPE.PLACEHOLDER;
-                        logEvent(LOG_TYPE.EFFECT, `MST: destroyed ${destroyed.card?.name}`);
-                        dispatchEnv(freshEnv);
-                        return;
-                    }
-                }
-            }
-        } catch { /* cancelled */ }
-    }, (env) =>
-        (env[SIDE.MINE][ENVIRONMENT.SPELL_FIELD]     || []).some(c => c?.card) ||
-        (env[SIDE.OPPONENT][ENVIRONMENT.SPELL_FIELD] || []).some(c => c?.card)
+    // Mystical Space Typhoon (5318639) — Quick-Play: target 1 Spell/Trap on the field; destroy it
+    // (Spell Speed 2 comes from the SPELL_QUICK card type via Core/Chain.getSpellSpeed)
+    5318639: onActivate(
+        destroyCards(
+            { zone: 'SPELL_FIELD', side: 'BOTH', count: 1 },
+            'Mystical Space Typhoon — destroy 1 Spell/Trap on the field'
+        ),
+        (env) =>
+            (env[SIDE.MINE][ENVIRONMENT.SPELL_FIELD]     || []).some(c => c?.card) ||
+            (env[SIDE.OPPONENT][ENVIRONMENT.SPELL_FIELD] || []).some(c => c?.card)
     ),
 
     // Dian Keto the Cure Master (84257639) — gain 1000 LP
@@ -452,16 +445,14 @@ export const EFFECTS_REGISTRY = {
     // ════════════════════════════════════════════════════════════════════════
 
     // Skyscraper (37120512) — continuous; HEROs gain 1000 ATK
-    37120512: continuous(
-        (env, side) => {
-            const isActive = (env[side][ENVIRONMENT.SPELL_FIELD] || [])
-                .some(c => c?.card?.key === 37120512);
-            if (!isActive) return;
-            for (const m of (env[side][ENVIRONMENT.MONSTER_FIELD] || [])) {
-                if (m !== CARD_TYPE.PLACEHOLDER && m?.card?.name?.toLowerCase().includes('hero'))
-                    m.current_atk = (m.current_atk ?? m.card.atk ?? 0) + 1000;
-            }
-        }
+    // Sword of Dark Destruction (37120512) — Equip: a DARK monster gains
+    // 400 ATK and loses 200 DEF. Real equip lifecycle: targets one monster,
+    // boosts only it, falls off when it leaves the field.
+    37120512: equipTo(
+        37120512,
+        { type: 'MONSTER', attribute: 'DARK' },
+        { atk: 400, def: -200 },
+        'Sword of Dark Destruction — equip to 1 DARK monster'
     ),
 
     // Miracle Fusion (45906428) — banish HERO materials, Fusion Summon
@@ -2171,42 +2162,25 @@ export const EFFECTS_REGISTRY = {
         },
     }],
 
-    // Wind-Up Rabbit (42874792) — Quick Effect: banish a Wind-Up until End Phase. Single use.
-    // Simplified: temporarily remove from field (returned at draw phase)
-    42874792: [{
-        wind_up: true,
-        once_per_turn: true,
-        condition: (env) => (env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD] || []).some(c =>
+    // Wind-Up Rabbit (42874792) — Quick Effect (Spell Speed 2, chainable):
+    // target 1 "Wind-Up" monster you control; banish it until your next
+    // Standby Phase. Single use while face-up (wind_up tracking).
+    // Real temporary banish via BANISHED zone + PhaseEvents — the old
+    // version sent the monster to the GY and never returned it.
+    42874792: quickEffect(
+        banishUntil(
+            {
+                filter: { nameIncludes: 'wind-up', type: 'MONSTER' },
+                returnPhase: PHASE.STANDBY_PHASE,
+                ownTurnOnly: true,
+            },
+            'Wind-Up Rabbit — banish 1 Wind-Up monster until your next Standby Phase'
+        ),
+        (env) => (env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD] || []).some(c =>
             c !== CARD_TYPE.PLACEHOLDER && c?.card?.name?.toLowerCase().includes('wind-up')
         ),
-        operation: async (env) => {
-            const valid = (env[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD] || []).filter(c =>
-                c !== CARD_TYPE.PLACEHOLDER && c?.card?.name?.toLowerCase().includes('wind-up')
-            );
-            try {
-                const result = await openSelector({
-                    type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
-                    label: 'Wind-Up Rabbit — banish 1 Wind-Up until End Phase (returns at draw phase)',
-                    sourceList: valid, numToSelect: 1,
-                });
-                if (!result?.cardEnvs?.length) return;
-                const freshEnv = store.getState().environmentReducer.environment;
-                const mf = freshEnv[SIDE.MINE][ENVIRONMENT.MONSTER_FIELD];
-                for (let i = 0; i < mf.length; i++) {
-                    if (mf[i] !== CARD_TYPE.PLACEHOLDER && mf[i]?.card &&
-                        get_unique_id_from_ennvironment(mf[i]) === result.cardEnvs[0]) {
-                        // Mark banished; return at next draw phase (Game.jsx handles this)
-                        mf[i].banished_return = true;
-                        freshEnv[SIDE.MINE][ENVIRONMENT.GRAVEYARD].push({ ...mf[i], banished_return: true });
-                        mf[i] = CARD_TYPE.PLACEHOLDER;
-                        logEvent(LOG_TYPE.EFFECT, 'Wind-Up Rabbit: banished a Wind-Up (returns at draw phase)');
-                        break;
-                    }
-                }
-                dispatchEnv(freshEnv);
-            } catch { /* cancelled */ }
-        },
-    }],
+        { windUp: true }
+    ),
 
     // Wind-Up Dog (12076263) — self: +2 Levels, +600 ATK. Single use.
     12076263: [{

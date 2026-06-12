@@ -1,6 +1,7 @@
 import { ENVIRONMENT, CARD_TYPE, SIDE, CARD_POS} from '../../../Card/utils/constant';
 import { CARD_SELECT_TYPE, MONSTER_ATTACK_TYPE, PHASE, DST_DIRECT_ATTACK } from '../../utils/constant'
 import { is_monster, is_spell, is_trap } from '../../../Card/utils/utils'
+import Battle from '../../../../Core/Battle'
 
 export const calculate_aim_style = (info) => {
     let {src_index, dst_index } = info;
@@ -119,6 +120,13 @@ export const returnAttackStatus = (cardEnv, game_meta, environment) => {
                 can_direct_attack: disabled_class,
                 can_others_attack: disabled_class
             }
+    }
+
+    // Defense-position monsters (face-up DEFENSE or face-down SET/SET_DEFENSE)
+    // cannot declare an attack. Same predicate the battle engine uses, so anything
+    // that would battle with its DEF is also barred from attacking.
+    if (Battle.isDefPos(cardEnv)) {
+        return { can_direct_attack: disabled_class, can_others_attack: disabled_class }
     }
 
     // Monster already attacked this turn — one attack per battle phase

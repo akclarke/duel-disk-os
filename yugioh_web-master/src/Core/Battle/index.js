@@ -9,9 +9,15 @@ import { get_unique_id_from_ennvironment } from '../../Components/PlayerGround/u
 import { fireTrigger, fireFieldWatchTriggers, TRIGGER_TYPE } from '../../data/triggerRegistry';
 import { logEvent, LOG_TYPE } from '../../data/duelLog';
 
-const isDefPos = (cardEnv) =>
+const isFaceDown = (cardEnv) =>
     cardEnv?.current_pos === CARD_POS.SET ||
     cardEnv?.current_pos === CARD_POS.SET_DEFENSE;
+
+// Defense position = face-down OR face-up Defense Mode (CARD_POS.DEFENSE) —
+// all of them battle with DEF, not ATK.
+const isDefPos = (cardEnv) =>
+    isFaceDown(cardEnv) ||
+    cardEnv?.current_pos === CARD_POS.DEFENSE;
 
 // Toon Kingdom: if monster is a Toon and Kingdom is active, banish top card instead
 const tryProtect = (cardEnv, env, side) => {
@@ -72,7 +78,32 @@ const battle = (info, environment) => {
     const defName = defender?.card?.name || '?';
     logEvent(LOG_TYPE.ATTACK, `${atkName} (${atkATK}) attacks ${defName}`, { cardName: atkName });
 
-    if (isDefPos(defender)) {
+    // Capture position BEFORE the battle reveal so the flip doesn't change
+    // which damage branch this battle resolves through.
+    const defenderWasDefPos = isDefPos(defender);
+    const defenderWasFaceDown = isFaceDown(defender);
+
+    // Battle reveal: a face-down defender flips face-up and its flip effect
+    // fires (effectFactory.onFlip → card.on_flip), per the rulebook.
+    // A monster already face-up in Defense Mode is NOT flipped again.
+    if (defenderWasFaceDown && typeof defender?.card?.on_flip === 'function') {
+        defender.current_pos = CARD_POS.DEFENSE;
+        const flipped = defender;
+        logEvent(LOG_TYPE.EFFECT, `${flipped.card?.name} was flipped — FLIP effect activates`);
+        setTimeout(() => {
+            try {
+                const store = require('../../Store/store').default;
+                const { update_environment } = require('../../Store/actions/environmentActions');
+                const freshEnv = store.getState().environmentReducer.environment;
+                const result = flipped.card.on_flip(freshEnv, defSide);
+                const finish = () => store.dispatch(update_environment(freshEnv));
+                if (result && typeof result.then === 'function') result.then(finish).catch(finish);
+                else finish();
+            } catch (e) { console.warn('[Battle] on_flip error:', e); }
+        }, 500);
+    }
+
+    if (defenderWasDefPos) {
         // ── ATK vs DEF ────────────────────────────────────────────────────────
         const defDEF = defender?.current_def ?? defender?.card?.def ?? 0;
         if (atkATK > defDEF) {
@@ -133,4 +164,4 @@ const get_battle_index = (src_monster, dst, side, environment) => {
     return { src_index, dst_index };
 };
 
-export default { battle, get_battle_index };
+export default { battle, get_battle_index, isDefPos, isFaceDown };

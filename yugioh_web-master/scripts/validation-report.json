@@ -35,7 +35,7 @@
     "passcode": 53129443,
     "cardName": "Dark Hole",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -67,7 +67,7 @@
     "passcode": 12580477,
     "cardName": "Raigeki",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -128,10 +128,42 @@
     }
   },
   {
+    "passcode": 79571449,
+    "cardName": "Graceful Charity",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), drawCards()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": false,
+      "triggerF": false,
+      "fieldEffect": false,
+      "ignition": false,
+      "activate": true,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": true,
+      "catDestroy": false,
+      "catDamage": false,
+      "catSsSummon": false,
+      "catBanish": false,
+      "catHandDest": true,
+      "catEquip": false,
+      "oncePer": false,
+      "quickEffect": false
+    }
+  },
+  {
     "passcode": 74137509,
     "cardName": "Graceful Dice",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -163,7 +195,7 @@
     "passcode": 19613556,
     "cardName": "Heavy Storm",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -194,8 +226,8 @@
   {
     "passcode": 5318639,
     "cardName": "Mystical Space Typhoon",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), destroyMonsters(), spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -290,8 +322,8 @@
   {
     "passcode": 97077563,
     "cardName": "Call of the Haunted",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate(), specialSummonFrom*(), spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), specialSummonFrom*(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -323,7 +355,7 @@
     "passcode": 213326,
     "cardName": "E - Emergency Call",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), searchDeck() or hand add",
+    "details": "Matches expected types: onActivate(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -355,7 +387,7 @@
     "passcode": 32807846,
     "cardName": "Reinforcement of the Army",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), searchDeck() or hand add",
+    "details": "Matches expected types: onActivate(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -451,7 +483,7 @@
     "passcode": 2314238,
     "cardName": "Dark Magic Attack",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -483,7 +515,7 @@
     "passcode": 63391643,
     "cardName": "Thousand Knives",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -514,8 +546,8 @@
   {
     "passcode": 37120512,
     "cardName": "Sword of Dark Destruction",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), equipTo() — WARN: primitive missing",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), equipTo()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -546,8 +578,8 @@
   {
     "passcode": 45906428,
     "cardName": "Miracle Fusion",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), specialSummonFrom*(), banish() — WARN: primitive missing",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), specialSummonFrom*(), banish()/banishFromGY()/banishUntil()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -610,8 +642,8 @@
   {
     "passcode": 43175858,
     "cardName": "Toon Kingdom",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate(), banish() — WARN: primitive missing",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), banish()/banishFromGY()/banishUntil()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -643,7 +675,7 @@
     "passcode": 89997728,
     "cardName": "Toon Table of Contents",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), searchDeck() or hand add",
+    "details": "Matches expected types: onActivate(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -675,7 +707,7 @@
     "passcode": 91500017,
     "cardName": "Toon Bookmark",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -707,7 +739,7 @@
     "passcode": 31733941,
     "cardName": "Red-Eyes Toon Dragon",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -739,7 +771,7 @@
     "passcode": 21296502,
     "cardName": "Toon Dark Magician",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -803,7 +835,7 @@
     "passcode": 40044918,
     "cardName": "Elemental HERO Stratos",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), searchDeck() or hand add, destroyMonsters()",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), searchDeck() or salvage(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -899,7 +931,7 @@
     "passcode": 40318957,
     "cardName": "Performapal Skullcrobat Joker",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, continuous() or whileOnField(), searchDeck() or hand add",
+    "details": "Matches expected types: onSummon() trigger, continuous() or whileOnField(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -931,7 +963,7 @@
     "passcode": 47075569,
     "cardName": "Performapal Pendulum Sorcerer",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or hand add, destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -963,7 +995,7 @@
     "passcode": 35272499,
     "cardName": "Predaplant Ophrys Scorpio",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -995,7 +1027,7 @@
     "passcode": 61677004,
     "cardName": "Predaplant Darlingtonia Cobra",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1059,7 +1091,7 @@
     "passcode": 96622984,
     "cardName": "Predaplant Flytrap",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1091,7 +1123,7 @@
     "passcode": 22011689,
     "cardName": "Predaplant Moray Nepenthes",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1123,7 +1155,7 @@
     "passcode": 44932065,
     "cardName": "Predaplant Byblisp",
     "status": "PASS",
-    "details": "Matches expected types: onDestroy(), onActivate() or oncePerTurn(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onDestroy(), onActivate() or oncePerTurn(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": true,
     "luaInfo": {
@@ -1155,7 +1187,7 @@
     "passcode": 44994712,
     "cardName": "Predaplant Longinephila",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), onActivate() or oncePerTurn(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), onActivate() or oncePerTurn(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1187,7 +1219,7 @@
     "passcode": 31643613,
     "cardName": "Predapractice",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1219,7 +1251,7 @@
     "passcode": 89176044,
     "cardName": "Predaprimitive",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), onActivate(), searchDeck() or hand add, destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), onActivate(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1282,8 +1314,8 @@
   {
     "passcode": 8148322,
     "cardName": "Predaprime Fusion",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), specialSummonFrom*(), once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1314,8 +1346,8 @@
   {
     "passcode": 14463695,
     "cardName": "Predapruning",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate(), specialSummonFrom*(), equipTo() — WARN: primitive missing",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), specialSummonFrom*(), equipTo()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1347,7 +1379,7 @@
     "passcode": 88069597,
     "cardName": "Predaponics",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), onPhase(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1378,8 +1410,8 @@
   {
     "passcode": 44536921,
     "cardName": "Predaplanning",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onSummon() trigger (special), continuous() or whileOnField(), onActivate(), destroyMonsters(), once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), onActivate(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1410,8 +1442,8 @@
   {
     "passcode": 25573115,
     "cardName": "Apex Predation",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate(), destroyMonsters(), once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1442,8 +1474,8 @@
   {
     "passcode": 25586143,
     "cardName": "Predaplant Chimerafflesia",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onDestroy(), onAttackDeclared(), continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or hand add, banish() — WARN: primitive missing, once_per_turn: true",
+    "status": "PASS",
+    "details": "Matches expected types: onDestroy(), onAttackDeclared(), continuous() or whileOnField(), onActivate() or oncePerTurn(), onPhase(), searchDeck() or salvage(), banish()/banishFromGY()/banishUntil(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1474,8 +1506,8 @@
   {
     "passcode": 69946549,
     "cardName": "Predaplant Dragostapelia",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1507,7 +1539,7 @@
     "passcode": 79864860,
     "cardName": "Predaplant Triphyoverutum",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1539,7 +1571,7 @@
     "passcode": 66309175,
     "cardName": "Predaplant Ambulomelides",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), onActivate() or oncePerTurn(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), onActivate() or oncePerTurn(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1571,7 +1603,7 @@
     "passcode": 41209827,
     "cardName": "Starving Venom Fusion Dragon",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), onPhase(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1603,7 +1635,7 @@
     "passcode": 51570882,
     "cardName": "Greedy Venom Fusion Dragon",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1634,8 +1666,8 @@
   {
     "passcode": 1828513,
     "cardName": "Shadow of the Six Samurai - Shien",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1667,7 +1699,7 @@
     "passcode": 29981921,
     "cardName": "Legendary Six Samurai - Shi En",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1699,7 +1731,7 @@
     "passcode": 34235530,
     "cardName": "Legendary Lord Six Samurai - Shi En",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or hand add, destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1731,7 +1763,7 @@
     "passcode": 70634245,
     "cardName": "Legendary Lord Six Samurai - Enishi",
     "status": "PASS",
-    "details": "Matches expected types: onDestroy(), onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onDestroy(), onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": true,
     "luaInfo": {
@@ -1762,8 +1794,8 @@
   {
     "passcode": 42209438,
     "cardName": "Legendary Lord Six Samurai - Kizan",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), specialSummonFrom*(), once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1794,8 +1826,8 @@
   {
     "passcode": 33964637,
     "cardName": "Secret Six Samurai - Rihan",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), onActivate() or oncePerTurn(), banish() — WARN: primitive missing, once_per_turn: true",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), banish()/banishFromGY()/banishUntil(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1827,7 +1859,7 @@
     "passcode": 81122844,
     "cardName": "Wind-Up Carrier Zenmaity",
     "status": "PASS",
-    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or hand add, specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": true,
     "luaInfo": {
@@ -1859,7 +1891,7 @@
     "passcode": 77334267,
     "cardName": "Wind-Up Arsenal Zenmaioh",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1891,7 +1923,7 @@
     "passcode": 78156759,
     "cardName": "Wind-Up Zenmaines",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onPhase(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1923,7 +1955,7 @@
     "passcode": 68597372,
     "cardName": "Wind-Up Zenmaister",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), onPhase(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1955,7 +1987,7 @@
     "passcode": 53540729,
     "cardName": "Wind-Up Warrior",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -1987,7 +2019,7 @@
     "passcode": 12299841,
     "cardName": "Wind-Up Soldier",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2019,7 +2051,7 @@
     "passcode": 58475908,
     "cardName": "Wind-Up Snail",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2051,7 +2083,7 @@
     "passcode": 25484449,
     "cardName": "Wind-Up Shark",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": true,
     "luaInfo": {
@@ -2083,7 +2115,7 @@
     "passcode": 57962537,
     "cardName": "Wind-Up Rat",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2114,8 +2146,8 @@
   {
     "passcode": 42874792,
     "cardName": "Wind-Up Rabbit",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: continuous() or whileOnField(), banish() — WARN: primitive missing, once_per_turn: true",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onPhase(), banish()/banishFromGY()/banishUntil(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2147,7 +2179,7 @@
     "passcode": 12076263,
     "cardName": "Wind-Up Dog",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2179,7 +2211,7 @@
     "passcode": 42328171,
     "cardName": "Wind-Up Bat",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2211,7 +2243,7 @@
     "passcode": 16923472,
     "cardName": "Wind-Up Hunter",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2243,7 +2275,7 @@
     "passcode": 85682655,
     "cardName": "Wind-Up Juggler",
     "status": "PASS",
-    "details": "Matches expected types: destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2275,7 +2307,7 @@
     "passcode": 25716180,
     "cardName": "Wind-Up Kitten",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2370,8 +2402,8 @@
   {
     "passcode": 91422370,
     "cardName": "Zenmailstrom",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), specialSummonFrom*(), spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), specialSummonFrom*(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2402,8 +2434,8 @@
   {
     "passcode": 29999161,
     "cardName": "Zenmairch",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: onActivate(), searchDeck() or hand add, specialSummonFrom*(), spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: onActivate(), searchDeck() or salvage(), specialSummonFrom*(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2435,7 +2467,7 @@
     "passcode": 83319610,
     "cardName": "Zenmaiday",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: onActivate(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2467,7 +2499,7 @@
     "passcode": 54031490,
     "cardName": "Shien's Smoke Signal",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), searchDeck() or hand add",
+    "details": "Matches expected types: onActivate(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2691,7 +2723,7 @@
     "passcode": 48505422,
     "cardName": "Legendary Six Samurai - Shinai",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or hand add",
+    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2723,7 +2755,7 @@
     "passcode": 74094021,
     "cardName": "Legendary Six Samurai - Mizuho",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2754,8 +2786,8 @@
   {
     "passcode": 75116619,
     "cardName": "Legendary Six Samurai - Enishi",
-    "status": "WARN",
-    "details": "Some effect types have no factory primitive. Expected: searchDeck() or hand add, once_per_turn: true, spell_speed: 2 — WARN: not tracked",
+    "status": "PASS",
+    "details": "Matches expected types: searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel(), quickEffect() — spell_speed: 2",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2787,7 +2819,7 @@
     "passcode": 83039729,
     "cardName": "Grandmaster of the Six Samurai",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or hand add",
+    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or salvage()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2819,7 +2851,7 @@
     "passcode": 78792195,
     "cardName": "Hand of the Six Samurai",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters()",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), destroyMonsters() or destroyCards()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2851,7 +2883,7 @@
     "passcode": 90397998,
     "cardName": "The Six Samurai - Kamon",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2883,7 +2915,7 @@
     "passcode": 64398890,
     "cardName": "The Six Samurai - Yaichi",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2947,7 +2979,7 @@
     "passcode": 80570228,
     "cardName": "Anarchist Monk of the Six Samurai",
     "status": "PASS",
-    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -2979,7 +3011,7 @@
     "passcode": 16968936,
     "cardName": "Tactical Trainer of the Six Samurai",
     "status": "PASS",
-    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onDestroy(), continuous() or whileOnField(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3075,7 +3107,7 @@
     "passcode": 38280762,
     "cardName": "Enishi, Shien's Chancellor",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3096,6 +3128,198 @@
       "catDestroy": true,
       "catDamage": false,
       "catSsSummon": false,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 82224646,
+    "cardName": "Performapal Odd-Eyes Synchron",
+    "status": "PASS",
+    "details": "Matches expected types: onSummon() trigger, onActivate() or oncePerTurn(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": false,
+      "ignition": true,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": true,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": false,
+      "catDestroy": false,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 69610326,
+    "cardName": "Supreme King Dragon Darkwurm",
+    "status": "PASS",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": true,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": true,
+      "evSpSummon": true,
+      "evPhase": false,
+      "catToHand": true,
+      "catDraw": false,
+      "catDestroy": false,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 41908872,
+    "cardName": "Supreme King Dragon Lightwurm",
+    "status": "PASS",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), searchDeck() or salvage(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": false,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": true,
+      "evSpSummon": true,
+      "evPhase": false,
+      "catToHand": true,
+      "catDraw": false,
+      "catDestroy": false,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 96733134,
+    "cardName": "Supreme King Dragon Odd-Eyes",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), specialSummonFrom*(), quickEffect() — spell_speed: 2",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": false,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": true,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": true,
+      "catDraw": false,
+      "catDestroy": true,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": false,
+      "quickEffect": true
+    }
+  },
+  {
+    "passcode": 96227613,
+    "cardName": "Supreme King Gate Zero",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": true,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": true,
+      "catDraw": false,
+      "catDestroy": true,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 22211622,
+    "cardName": "Supreme King Gate Infinity",
+    "status": "PASS",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), destroyMonsters() or destroyCards(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": true,
+    "inTriggers": false,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": true,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": false,
+      "catDestroy": true,
+      "catDamage": false,
+      "catSsSummon": true,
       "catBanish": false,
       "catHandDest": false,
       "catEquip": false,
@@ -3171,7 +3395,7 @@
     "passcode": 26082117,
     "cardName": "Gagaga Magician",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3203,7 +3427,7 @@
     "passcode": 12014404,
     "cardName": "Gagaga Cowboy",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), dealDamage(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), dealDamage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3232,10 +3456,42 @@
     }
   },
   {
+    "passcode": 53025096,
+    "cardName": "Odd-Eyes Dragon",
+    "status": "PASS",
+    "details": "Matches expected types: dealDamage()",
+    "inEffects": true,
+    "inTriggers": true,
+    "luaInfo": {
+      "triggerO": false,
+      "triggerF": true,
+      "fieldEffect": false,
+      "ignition": false,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": false,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": false,
+      "catDestroy": false,
+      "catDamage": true,
+      "catSsSummon": false,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": false,
+      "quickEffect": false
+    }
+  },
+  {
     "passcode": 16178681,
     "cardName": "Odd-Eyes Pendulum Dragon",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or hand add, destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onPhase(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3267,7 +3523,7 @@
     "passcode": 73130445,
     "cardName": "Performapal Lizardraw",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), drawCards(), destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate() or oncePerTurn(), drawCards(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": true,
     "inTriggers": false,
     "luaInfo": {
@@ -3299,7 +3555,7 @@
     "passcode": 30537973,
     "cardName": "Predaplant Spider Orchid",
     "status": "PASS",
-    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), searchDeck() or hand add, destroyMonsters(), once_per_turn: true",
+    "details": "Matches expected types: onSummon() trigger, onSummon() trigger (special), continuous() or whileOnField(), onActivate() or oncePerTurn(), onPhase(), searchDeck() or salvage(), destroyMonsters() or destroyCards(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3331,7 +3587,7 @@
     "passcode": 17330916,
     "cardName": "Performapal Monkeyboard",
     "status": "PASS",
-    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: onActivate() or oncePerTurn(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3363,7 +3619,7 @@
     "passcode": 26202165,
     "cardName": "Sangan",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3395,7 +3651,7 @@
     "passcode": 78010363,
     "cardName": "Witch of the Black Forest",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3459,7 +3715,7 @@
     "passcode": 44095762,
     "cardName": "Mirror Force",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3491,7 +3747,7 @@
     "passcode": 56120475,
     "cardName": "Sakuretsu Armor",
     "status": "PASS",
-    "details": "Matches expected types: onActivate(), destroyMonsters()",
+    "details": "Matches expected types: onActivate(), destroyMonsters() or destroyCards()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3552,6 +3808,70 @@
     }
   },
   {
+    "passcode": 16691074,
+    "cardName": "Odd-Eyes Absolute Dragon",
+    "status": "PASS",
+    "details": "Matches expected types: onDestroy(), onAttackDeclared(), continuous() or whileOnField(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
+    "inEffects": false,
+    "inTriggers": true,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": false,
+      "fieldEffect": true,
+      "ignition": false,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": true,
+      "evBattleDamage": false,
+      "evAttackAnnounce": true,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": false,
+      "catDestroy": false,
+      "catDamage": false,
+      "catSsSummon": true,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": true,
+      "quickEffect": false
+    }
+  },
+  {
+    "passcode": 84013237,
+    "cardName": "Number 39: Utopia",
+    "status": "PASS",
+    "details": "Matches expected types: onAttackDeclared(), continuous() or whileOnField(), destroyMonsters() or destroyCards()",
+    "inEffects": false,
+    "inTriggers": true,
+    "luaInfo": {
+      "triggerO": true,
+      "triggerF": true,
+      "fieldEffect": true,
+      "ignition": false,
+      "activate": false,
+      "continuous": false,
+      "evToGrave": false,
+      "evBattleDamage": false,
+      "evAttackAnnounce": true,
+      "evSummon": false,
+      "evSpSummon": false,
+      "evPhase": false,
+      "catToHand": false,
+      "catDraw": false,
+      "catDestroy": true,
+      "catDamage": false,
+      "catSsSummon": false,
+      "catBanish": false,
+      "catHandDest": false,
+      "catEquip": false,
+      "oncePer": false,
+      "quickEffect": false
+    }
+  },
+  {
     "passcode": 93451636,
     "cardName": "Wind-Up Honeybee",
     "status": "PASS",
@@ -3587,7 +3907,7 @@
     "passcode": 80538728,
     "cardName": "Wind-Up Knight",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3619,7 +3939,7 @@
     "passcode": 95714077,
     "cardName": "Wind-Up Factory",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or hand add, once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), onActivate(), searchDeck() or salvage(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {
@@ -3651,7 +3971,7 @@
     "passcode": 59297550,
     "cardName": "Wind-Up Magician",
     "status": "PASS",
-    "details": "Matches expected types: continuous() or whileOnField(), specialSummonFrom*(), once_per_turn: true",
+    "details": "Matches expected types: continuous() or whileOnField(), specialSummonFrom*(), once_per_turn (oncePerTurn()/quickEffect()) or oncePerDuel()",
     "inEffects": false,
     "inTriggers": true,
     "luaInfo": {

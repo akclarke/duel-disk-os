@@ -33,6 +33,18 @@ const resetStats = (environment) => {
             // Reset to base values each cycle
             cardEnv.current_atk = cardEnv.card.atk ?? 0;
             cardEnv.current_def = cardEnv.card.def ?? 0;
+            // Re-apply temporary modifiers (effectFactory.boostStats / setStats).
+            // These survive the reset; PhaseEvents removes them when their
+            // "until" phase arrives, so "+700 ATK until the End Phase" holds
+            // across every state update in between.
+            if (Array.isArray(cardEnv.temp_mods)) {
+                for (const mod of cardEnv.temp_mods) {
+                    if (mod.set_atk !== undefined) cardEnv.current_atk = mod.set_atk;
+                    if (mod.set_def !== undefined) cardEnv.current_def = mod.set_def;
+                    cardEnv.current_atk += mod.atk || 0;
+                    cardEnv.current_def += mod.def || 0;
+                }
+            }
         }
     }
 };

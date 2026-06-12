@@ -19,7 +19,8 @@
  */
 
 import { ENVIRONMENT, SIDE, CARD_TYPE, CARD_POS } from '../Components/Card/utils/constant';
-import { CARD_SELECT_TYPE } from '../Components/PlayerGround/utils/constant';
+import { CARD_SELECT_TYPE, PHASE } from '../Components/PlayerGround/utils/constant';
+import PhaseEvents from '../Core/PhaseEvents';
 import { TRIGGER_TYPE } from './triggerRegistry';
 import { TOOL_TYPE } from '../Store/actions/actionTypes';
 import { show_tool } from '../Store/actions/toolActions';
@@ -670,3 +671,585 @@ export const collectiveBoost = (amount, filter, cardKey) =>
             passiveBoost(count * amount, filter)(env, side);
         }
     );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── RULEBOOK PRIMITIVES (engine-hooked) ──────────────────────────────────────
+// Every rulebook mechanic that needs engine support has a primitive here.
+// Each rides a real hook — none of these are decorative:
+//   • Core/PhaseEvents          — banishUntil, boostStats({until}),
+//                                 takeControl({until}), onPhase
+//   • Core/Chain spell speeds   — quickEffect (speed 2), counterTrap (speed 3)
+//   • Core/OncePer permanent map— oncePerDuel (wind_up tracking)
+//   • Core/Battle hooks         — onFlip, protectFromBattleDestroy,
+//                                 damageMultiplier
+//   • environmentReducer        — temp_mods (boostStats survives stat resets)
+// PHASE is re-exported below so registry entries can write
+// `until: PHASE.END_PHASE` without an extra import.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { PHASE };
+
+const oppositeOf = (side) => side === SIDE.MINE ? SIDE.OPPONENT : SIDE.MINE;
+
+const resolveSides = (optsSide, side) =>
+    optsSide === 'MINE'     ? [side]
+  : optsSide === 'OPPONENT' ? [oppositeOf(side)]
+  : optsSide === 'BOTH'     ? [SIDE.MINE, SIDE.OPPONENT]
+  :                           [side];
+
+/**
+ * Send card(s) to the GY WITHOUT destroying them — no destroy triggers fire.
+ * The rulebook distinguishes "send" from "destroy" (costs, Synchro materials,
+ * mill effects); use destroyMonsters()/destroyCards() when the card text says
+ * "destroy".
+ * opts: { side: 'MINE'|'OPPONENT'|'BOTH', from: ENVIRONMENT.*, filter, count }
+ */
+export const sendToGY = (opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const from   = opts.from || ENVIRONMENT.MONSTER_FIELD;
+    const max    = opts.count ?? 99;
+    let sent = 0;
+    for (const s of resolveSides(opts.side, side)) {
+        const zone = env[s][from];
+        if (!Array.isArray(zone)) continue;
+        for (let i = 0; i < zone.length && sent < max; i++) {
+            const c = zone[i];
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+            if (!filter(c)) continue;
+            env[s][ENVIRONMENT.GRAVEYARD].push(c);
+            if (from === ENVIRONMENT.MONSTER_FIELD || from === ENVIRONMENT.SPELL_FIELD) {
+                zone[i] = CARD_TYPE.PLACEHOLDER;
+            } else {
+                zone.splice(i, 1); i--;
+            }
+            sent++;
+        }
+    }
+};
+
+/**
+ * Add card(s) from your GY to your hand (player selects).
+ * opts: { filter, count }
+ */
+export const salvage = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || opts);
+    const pool = getGY(env, side).filter(filter);
+    if (!pool.length) return Promise.resolve();
+    return openSelector({
+        type: CARD_SELECT_TYPE.CARD_SELECT_FROM_HAND,
+        label: label || 'Add 1 card from your Graveyard to your hand',
+        sourceList: pool,
+        numToSelect: opts.count ?? 1,
+    }).then(({ cardEnvs: uids }) => {
+        const gy = env[side][ENVIRONMENT.GRAVEYARD];
+        for (const uid of uids) {
+            const idx = gy.findIndex(c => get_unique_id_from_ennvironment(c) === uid);
+            if (idx !== -1) env[side][ENVIRONMENT.HAND].push(gy.splice(idx, 1)[0]);
+        }
+    }).catch(() => {});
+};
+
+/** Fisher-Yates shuffle of a deck. targetSide: 'MINE' | 'OPPONENT' */
+export const shuffleDeck = (targetSide = 'MINE') => (env, side = SIDE.MINE) => {
+    const s = targetSide === 'OPPONENT' ? oppositeOf(side) : side;
+    const deck = env[s][ENVIRONMENT.DECK] || [];
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+};
+
+/**
+ * Return card(s) to the deck.
+ * opts: { side, from: ENVIRONMENT.* (default GRAVEYARD), filter, count,
+ *         placement: 'shuffle' | 'top' | 'bottom' (default 'shuffle') }
+ */
+export const toDeck = (opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const from   = opts.from || ENVIRONMENT.GRAVEYARD;
+    const max    = opts.count ?? 99;
+    const placement = opts.placement || 'shuffle';
+    let moved = 0;
+    for (const s of resolveSides(opts.side, side)) {
+        const zone = env[s][from];
+        if (!Array.isArray(zone)) continue;
+        for (let i = 0; i < zone.length && moved < max; i++) {
+            const c = zone[i];
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+            if (!filter(c)) continue;
+            const deck = env[s][ENVIRONMENT.DECK];
+            if (placement === 'top') deck.unshift(c);
+            else deck.push(c); // 'bottom' and pre-shuffle both append
+            if (from === ENVIRONMENT.MONSTER_FIELD || from === ENVIRONMENT.SPELL_FIELD) {
+                zone[i] = CARD_TYPE.PLACEHOLDER;
+            } else {
+                zone.splice(i, 1); i--;
+            }
+            moved++;
+        }
+        if (moved && placement === 'shuffle') shuffleDeck(s === side ? 'MINE' : 'OPPONENT')(env, side);
+    }
+};
+
+/**
+ * TEMPORARY banish — banish a monster and return it at a future phase
+ * ("banish until your next Standby Phase"). Rides Core/PhaseEvents.
+ * opts: { filter, side: 'MINE'|'OPPONENT' (whose monster — default MINE),
+ *         returnPhase: PHASE.* (default STANDBY_PHASE),
+ *         ownTurnOnly: bool (default true — "YOUR next Standby Phase") }
+ */
+export const banishUntil = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const targetSide = opts.side === 'OPPONENT' ? oppositeOf(side) : side;
+    const filter = buildFilter(opts.filter || {});
+    const pool = getField(env, targetSide).filter(filter);
+    if (!pool.length) return Promise.resolve();
+
+    return openSelector({
+        type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+        label: label || 'Banish 1 monster (it returns later)',
+        sourceList: pool,
+        numToSelect: 1,
+    }).then(({ cardEnvs: [uid] }) => {
+        const field = env[targetSide][ENVIRONMENT.MONSTER_FIELD];
+        const idx = field.findIndex(c =>
+            c !== CARD_TYPE.PLACEHOLDER && get_unique_id_from_ennvironment(c) === uid);
+        if (idx === -1) return;
+        const cardEnv = field[idx];
+        field[idx] = CARD_TYPE.PLACEHOLDER;
+        if (!env[targetSide][ENVIRONMENT.BANISHED]) env[targetSide][ENVIRONMENT.BANISHED] = [];
+        env[targetSide][ENVIRONMENT.BANISHED].push(cardEnv);
+
+        PhaseEvents.schedule(
+            opts.returnPhase || PHASE.STANDBY_PHASE,
+            (futureEnv) => {
+                const ban = futureEnv[targetSide][ENVIRONMENT.BANISHED] || [];
+                const bIdx = ban.findIndex(c => get_unique_id_from_ennvironment(c) === uid);
+                if (bIdx === -1) return; // moved elsewhere in the meantime
+                const [returned] = ban.splice(bIdx, 1);
+                if (!placeOnField(returned, futureEnv, targetSide)) {
+                    futureEnv[targetSide][ENVIRONMENT.HAND].push(returned); // field full
+                }
+            },
+            { side: targetSide, ownTurnOnly: opts.ownTurnOnly !== false }
+        );
+    }).catch(() => {});
+};
+
+/** Banish face-down (Pot of Desires / Different Dimension patterns). */
+export const banishFaceDown = (opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const from   = opts.from || ENVIRONMENT.DECK;
+    const max    = opts.count ?? 1;
+    const s      = opts.side === 'OPPONENT' ? oppositeOf(side) : side;
+    const zone   = env[s][from];
+    if (!Array.isArray(zone)) return;
+    if (!env[s][ENVIRONMENT.BANISHED]) env[s][ENVIRONMENT.BANISHED] = [];
+    let n = 0;
+    for (let i = 0; i < zone.length && n < max; i++) {
+        const c = zone[i];
+        if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+        if (!filter(c)) continue;
+        c.banished_facedown = true;
+        env[s][ENVIRONMENT.BANISHED].push(c);
+        if (from === ENVIRONMENT.MONSTER_FIELD || from === ENVIRONMENT.SPELL_FIELD) {
+            zone[i] = CARD_TYPE.PLACEHOLDER;
+        } else {
+            zone.splice(i, 1); i--;
+        }
+        n++;
+    }
+};
+
+/**
+ * Summon token monster(s) to your field.
+ * opts: { name, atk, def, level, race, attribute, count, position: CARD_POS.* }
+ */
+export const summonToken = (opts = {}) => (env, side = SIDE.MINE) => {
+    const count = opts.count ?? 1;
+    for (let i = 0; i < count; i++) {
+        const tokenEnv = {
+            card: {
+                key: -(Date.now() % 10000000) - i, // negative key — never collides with passcodes
+                name: opts.name || 'Token',
+                atk: opts.atk ?? 0,
+                def: opts.def ?? 0,
+                level: opts.level ?? 1,
+                attribute: opts.attribute || 'EARTH',
+                race: opts.race || 'Beast',
+                description: 'Token (special summoned by a card effect)',
+                card_type: 'MONSTER_NORMAL',
+                card_pic: null,
+                is_token: true,
+                effects: [],
+            },
+            unique_count: Date.now() + Math.floor(Math.random() * 100000) + i,
+        };
+        if (!placeOnField(tokenEnv, env, side)) break; // field full
+        if (opts.position) tokenEnv.current_pos = opts.position;
+    }
+};
+
+/**
+ * Take control of an opponent's monster (player selects).
+ * opts: { filter, until: PHASE.* | null — null = permanent (Change of Heart
+ *         is until END_PHASE; Brain Control historic text too) }
+ */
+export const takeControl = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const opp = oppositeOf(side);
+    const filter = buildFilter(opts.filter || {});
+    const pool = getField(env, opp).filter(filter);
+    if (!pool.length) return Promise.resolve();
+
+    return openSelector({
+        type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+        label: label || "Take control of 1 opponent monster",
+        sourceList: pool,
+        numToSelect: 1,
+    }).then(({ cardEnvs: [uid] }) => {
+        const oppField = env[opp][ENVIRONMENT.MONSTER_FIELD];
+        const idx = oppField.findIndex(c =>
+            c !== CARD_TYPE.PLACEHOLDER && get_unique_id_from_ennvironment(c) === uid);
+        if (idx === -1) return;
+        const cardEnv = oppField[idx];
+        oppField[idx] = CARD_TYPE.PLACEHOLDER;
+        if (!placeOnField(cardEnv, env, side)) {
+            oppField[idx] = cardEnv; // my field full — control change fizzles
+            return;
+        }
+        if (opts.until) {
+            PhaseEvents.schedule(opts.until, (futureEnv) => {
+                const myField = futureEnv[side][ENVIRONMENT.MONSTER_FIELD];
+                const i2 = myField.findIndex(c =>
+                    c !== CARD_TYPE.PLACEHOLDER && get_unique_id_from_ennvironment(c) === uid);
+                if (i2 === -1) return; // left the field — nothing to return
+                const back = myField[i2];
+                myField[i2] = CARD_TYPE.PLACEHOLDER;
+                if (!placeOnField(back, futureEnv, opp)) {
+                    futureEnv[opp][ENVIRONMENT.GRAVEYARD].push(back);
+                }
+            }, { side, ownTurnOnly: true });
+        }
+    }).catch(() => {});
+};
+
+/**
+ * Tribute cost — player sends N of their own monsters to the GY as a cost
+ * (a "send", not a "destroy" — no destroy triggers, per the rulebook).
+ */
+export const tributeCost = (n = 1, opts = {}, label) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || opts);
+    const pool = getField(env, side).filter(filter);
+    if (pool.length < n) return Promise.resolve();
+    return openSelector({
+        type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+        label: label || `Tribute ${n} monster(s)`,
+        sourceList: pool,
+        numToSelect: n,
+    }).then(({ cardEnvs: uids }) => {
+        const field = env[side][ENVIRONMENT.MONSTER_FIELD];
+        for (const uid of uids) {
+            const idx = field.findIndex(c =>
+                c !== CARD_TYPE.PLACEHOLDER && get_unique_id_from_ennvironment(c) === uid);
+            if (idx !== -1) {
+                env[side][ENVIRONMENT.GRAVEYARD].push(field[idx]);
+                field[idx] = CARD_TYPE.PLACEHOLDER;
+            }
+        }
+    }).catch(() => {});
+};
+
+/**
+ * Place N counters of `name` on the first monster matching opts.filter
+ * (e.g. Spell Counters, Predator Counters). Counters live on
+ * cardEnv.counters = { [name]: n } and survive stat resets.
+ */
+export const addCounter = (name, n = 1, opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    for (const s of resolveSides(opts.side, side)) {
+        for (const c of env[s][ENVIRONMENT.MONSTER_FIELD] || []) {
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+            if (!filter(c)) continue;
+            c.counters = c.counters || {};
+            c.counters[name] = (c.counters[name] || 0) + n;
+            if (!opts.all) return;
+        }
+    }
+};
+
+/** Remove up to N counters of `name` (cost payment). */
+export const removeCounter = (name, n = 1, opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    for (const s of resolveSides(opts.side, side)) {
+        for (const c of env[s][ENVIRONMENT.MONSTER_FIELD] || []) {
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card?.key) continue;
+            if (!filter(c)) continue;
+            if (!c.counters?.[name]) continue;
+            c.counters[name] = Math.max(0, c.counters[name] - n);
+            if (!opts.all) return;
+        }
+    }
+};
+
+/** Read a counter value (for conditions: getCounter(cardEnv, 'Spell') >= 2). */
+export const getCounter = (cardEnv, name) => cardEnv?.counters?.[name] || 0;
+
+/**
+ * Timed stat change that SURVIVES the engine's per-update stat reset
+ * (environmentReducer re-applies temp_mods after every reset; PhaseEvents
+ * removes them when `until` arrives).
+ * amounts: { atk: +n, def: +n, setAtk: n, setDef: n }
+ * opts:    { filter, side: 'MINE'|'OPPONENT'|'BOTH',
+ *            until: PHASE.* | null (default END_PHASE — "until the end of
+ *            this turn"; null = permanent while on field) }
+ */
+export const boostStats = (amounts = {}, opts = {}) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const until  = opts.until === undefined ? PHASE.END_PHASE : opts.until;
+    const applied = [];
+    for (const s of resolveSides(opts.side, side)) {
+        for (const c of env[s][ENVIRONMENT.MONSTER_FIELD] || []) {
+            if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+            if (!filter(c)) continue;
+            const mod = {
+                atk: amounts.atk || 0,
+                def: amounts.def || 0,
+            };
+            if (amounts.setAtk !== undefined) mod.set_atk = amounts.setAtk;
+            if (amounts.setDef !== undefined) mod.set_def = amounts.setDef;
+            c.temp_mods = c.temp_mods || [];
+            c.temp_mods.push(mod);
+            applied.push({ cardEnv: c, mod });
+            // Apply immediately too, so the change is visible before the
+            // next reducer pass
+            if (mod.set_atk !== undefined) c.current_atk = mod.set_atk;
+            if (mod.set_def !== undefined) c.current_def = mod.set_def;
+            c.current_atk = (c.current_atk ?? c.card.atk ?? 0) + mod.atk;
+            c.current_def = (c.current_def ?? c.card.def ?? 0) + mod.def;
+        }
+    }
+    if (until && applied.length) {
+        PhaseEvents.schedule(until, () => {
+            for (const { cardEnv, mod } of applied) {
+                if (!Array.isArray(cardEnv.temp_mods)) continue;
+                const i = cardEnv.temp_mods.indexOf(mod);
+                if (i !== -1) cardEnv.temp_mods.splice(i, 1);
+            }
+        }, { side, ownTurnOnly: false });
+    }
+};
+
+/** Set ATK/DEF to a fixed value (MAKE_ATK_0 patterns). Same opts as boostStats. */
+export const setStats = (amounts = {}, opts = {}) =>
+    boostStats({ setAtk: amounts.atk, setDef: amounts.def }, opts);
+
+/**
+ * Targeted destroy with player selection (MST pattern: "target 1 card;
+ * destroy it"). Fires destroy triggers for monsters, unlike sendToGY.
+ * opts: { zone: 'MONSTER_FIELD' | 'SPELL_FIELD' | 'ANY' (default 'ANY'),
+ *         side: 'MINE'|'OPPONENT'|'BOTH' (default 'BOTH'), filter, count }
+ */
+export const destroyCards = (opts = {}, label) => (env, side = SIDE.MINE) => {
+    const filter = buildFilter(opts.filter || {});
+    const zones = opts.zone === 'MONSTER_FIELD' ? [ENVIRONMENT.MONSTER_FIELD]
+                : opts.zone === 'SPELL_FIELD'   ? [ENVIRONMENT.SPELL_FIELD]
+                : [ENVIRONMENT.MONSTER_FIELD, ENVIRONMENT.SPELL_FIELD];
+    const pool = [];
+    for (const s of resolveSides(opts.side || 'BOTH', side)) {
+        for (const zone of zones) {
+            for (const c of env[s][zone] || []) {
+                if (c === CARD_TYPE.PLACEHOLDER || !c?.card) continue;
+                if (!filter(c)) continue;
+                pool.push(c);
+            }
+        }
+    }
+    if (!pool.length) return Promise.resolve();
+
+    return openSelector({
+        type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+        label: label || `Destroy ${opts.count ?? 1} card(s)`,
+        sourceList: pool,
+        numToSelect: opts.count ?? 1,
+    }).then(({ cardEnvs: uids }) => {
+        const destroyedMonsters = [];
+        for (const uid of uids) {
+            for (const s of [SIDE.MINE, SIDE.OPPONENT]) {
+                for (const zone of zones) {
+                    const arr = env[s][zone];
+                    if (!Array.isArray(arr)) continue;
+                    const idx = arr.findIndex(c =>
+                        c !== CARD_TYPE.PLACEHOLDER && c?.card &&
+                        get_unique_id_from_ennvironment(c) === uid);
+                    if (idx === -1) continue;
+                    const cardEnv = arr[idx];
+                    const isPendulum = cardEnv.card?.card_type === 'MONSTER_PENDULUM';
+                    const dest = isPendulum && zone === ENVIRONMENT.MONSTER_FIELD
+                        ? ENVIRONMENT.EXTRA_DECK : ENVIRONMENT.GRAVEYARD;
+                    env[s][dest].push(cardEnv);
+                    arr[idx] = CARD_TYPE.PLACEHOLDER;
+                    if (zone === ENVIRONMENT.MONSTER_FIELD) destroyedMonsters.push({ cardEnv, s });
+                }
+            }
+        }
+        if (destroyedMonsters.length) {
+            const { fireTrigger, fireFieldWatchTriggers } = require('./triggerRegistry');
+            for (const { cardEnv, s } of destroyedMonsters) {
+                fireTrigger(TRIGGER_TYPE.ON_DESTROY, cardEnv, env, s);
+                fireFieldWatchTriggers(TRIGGER_TYPE.ON_ALLY_DESTROYED, cardEnv, env, s, true);
+            }
+        }
+    }).catch(() => {});
+};
+
+// ── RULEBOOK WRAPPERS ─────────────────────────────────────────────────────────
+
+/**
+ * QUICK EFFECT (Spell Speed 2) — activatable during either player's turn and
+ * chainable. Core/Chain reads spell_speed / quick_effect when building chain
+ * windows; face-up monsters with quick_effect appear as chain responses.
+ * opts: { oncePerTurn: bool (default true), windUp: bool — single use while
+ *         face-up (Core/OncePer permanent tracking) }
+ */
+export const quickEffect = (operation, conditionFn = () => true, opts = {}) => [{
+    condition: conditionFn,
+    target: null,
+    operation: (env, side = SIDE.MINE, targets) => operation(env, side, targets),
+    quick_effect: true,
+    spell_speed: 2,
+    ...(opts.oncePerTurn !== false ? { once_per_turn: true } : {}),
+    ...(opts.windUp ? { wind_up: true } : {}),
+}];
+
+/**
+ * COUNTER TRAP (Spell Speed 3) — only speed-3 effects can respond to it.
+ * Chain-link negation itself is performed by Core/Chain.negateLink; the
+ * operation receives (env, side, targets) when the link resolves.
+ */
+export const counterTrap = (operation, conditionFn = () => true) => [{
+    condition: conditionFn,
+    target: null,
+    operation: (env, side = SIDE.MINE, targets) => operation(env, side, targets),
+    spell_speed: 3,
+}];
+
+/**
+ * HARD once-per-duel / once-while-face-up effect — rides Core/OncePer's
+ * permanent (wind_up) tracking, which is cleared only when the card leaves
+ * the field.
+ */
+export const oncePerDuel = (operation, conditionFn = () => true) => [{
+    condition: conditionFn,
+    target: null,
+    operation: (env, side = SIDE.MINE) => operation(env, side),
+    wind_up: true,
+}];
+
+/**
+ * Phase trigger — operation fires automatically at `phase` while this card
+ * is face-up on the field (rides Core/PhaseEvents, fired from Game.jsx).
+ * opts: { ownTurnOnly: bool (default true — "during YOUR Standby Phase"),
+ *         condition: extra (env, side) => bool gate }
+ */
+export const onPhase = (phase, operation, opts = {}) => [{
+    condition: () => false, // not click-activatable — fires on phase change
+    target: null,
+    operation: (env, side = SIDE.MINE) => operation(env, side),
+    phase_trigger: { phase, ownTurnOnly: opts.ownTurnOnly !== false },
+    phase_condition: opts.condition || null,
+}];
+
+/**
+ * FLIP effect — fires when this monster is flipped face-up by battle
+ * (Core/Battle reveal hook). Man-Eater Bug pattern.
+ */
+export const onFlip = (operation) => [{
+    condition: () => false,
+    target: null,
+    operation: () => {},
+    on_flip: (env, side) => operation(env, side),
+}];
+
+/**
+ * Battle-destruction protection — Core/Battle consults
+ * can_protect_from_destroy/protect_from_destroy before sending a monster to
+ * the GY (Zenmaines pattern: pass a conditionFn that pays the cost and
+ * returns true, or use the default for blanket protection).
+ */
+export const protectFromBattleDestroy = (conditionFn = () => true, onProtect = null) => [{
+    condition: () => false,
+    target: null,
+    operation: () => {},
+    can_protect_from_destroy: (cardEnv) => conditionFn(cardEnv),
+    protect_from_destroy: (cardEnv, env, side) => {
+        if (onProtect) onProtect(cardEnv, env, side);
+        return env;
+    },
+}];
+
+/** Battle damage multiplier (Odd-Eyes pattern — doubles battle damage). */
+export const damageMultiplier = (n) => [{
+    condition: () => false,
+    target: null,
+    operation: () => {},
+    battle_damage_multiplier: n,
+}];
+
+/**
+ * EQUIP SPELL — full lifecycle:
+ *  1. On activation: player targets a monster matching targetOpts; the
+ *     target's uid is recorded on the equip card.
+ *  2. While both remain on the field: boost {atk, def} (or a custom
+ *     passiveFn(target, env, side)) applies via the passive walk.
+ *  3. If the equipped monster leaves the field: the equip card goes to
+ *     the GY ("falls off"), per the rulebook.
+ *
+ * @param {number} equipKey   the equip spell's own passcode
+ * @param {object} targetOpts buildFilter options for legal targets
+ * @param {object|function} boost {atk, def} or (targetCardEnv, env, side) => void
+ */
+export const equipTo = (equipKey, targetOpts = {}, boost = {}, label) => [{
+    condition: (env) =>
+        getField(env, SIDE.MINE).some(buildFilter(targetOpts)),
+    target: null,
+    is_continuous: true, // stays on the field like a Continuous Spell
+    operation: (env, side = SIDE.MINE) => {
+        const filter = buildFilter(targetOpts);
+        const pool = getField(env, side).filter(filter);
+        if (!pool.length) return Promise.resolve();
+        return openSelector({
+            type: CARD_SELECT_TYPE.CARD_SELECT_BATTLE_SELECT,
+            label: label || 'Equip to 1 monster',
+            sourceList: pool,
+            numToSelect: 1,
+        }).then(({ cardEnvs: [uid] }) => {
+            // Record the target on the equip card (it is on the spell field
+            // by the time the operation resolves)
+            const equip = (env[side][ENVIRONMENT.SPELL_FIELD] || [])
+                .find(c => c?.card?.key === equipKey && !c.equip_target);
+            if (equip) equip.equip_target = uid;
+        }).catch(() => {});
+    },
+    passive_effect: (env, side) => {
+        const spellField = env[side][ENVIRONMENT.SPELL_FIELD] || [];
+        for (let i = 0; i < spellField.length; i++) {
+            const equip = spellField[i];
+            if (!equip?.card || equip.card.key !== equipKey) continue;
+            if (!equip.equip_target) continue; // not yet attached
+            const target = (env[side][ENVIRONMENT.MONSTER_FIELD] || []).find(c =>
+                c !== CARD_TYPE.PLACEHOLDER && c?.card &&
+                get_unique_id_from_ennvironment(c) === equip.equip_target);
+            if (!target) {
+                // Equipped monster left the field — the equip falls off
+                env[side][ENVIRONMENT.GRAVEYARD].push(equip);
+                spellField[i] = CARD_TYPE.PLACEHOLDER;
+                continue;
+            }
+            if (typeof boost === 'function') {
+                boost(target, env, side);
+            } else {
+                target.current_atk = (target.current_atk ?? target.card.atk ?? 0) + (boost.atk || 0);
+                target.current_def = (target.current_def ?? target.card.def ?? 0) + (boost.def || 0);
+            }
+        }
+    },
+}];

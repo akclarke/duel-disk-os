@@ -134,13 +134,16 @@ class CPUPlayer {
                     side: this.side,
                 }));
             } else {
+                // Defense-position targets battle with DEF, not ATK — compare against
+                // the stat the engine will actually use (Core.Battle.isDefPos).
+                const battleStat = (c) => Core.Battle.isDefPos(c)
+                    ? (c.current_def ?? c.card.def ?? 0)
+                    : (c.current_atk ?? c.card.atk ?? 0);
                 const target = oppMonsters.reduce((weakest, c) =>
-                    (c.current_atk ?? c.card.atk ?? 0) < (weakest.current_atk ?? weakest.card.atk ?? 0)
-                        ? c : weakest,
+                    battleStat(c) < battleStat(weakest) ? c : weakest,
                     oppMonsters[0]
                 );
-                const targetAtk = target.current_atk ?? target.card.atk ?? 0;
-                if (myAtk >= targetAtk) {
+                if (myAtk >= battleStat(target)) {
                     console.log(`[CPU ${this.side}] ${attacker.card.name} attacks ${target.card.name}`);
                     store.dispatch(others_attack({
                         src_monster: uid,
